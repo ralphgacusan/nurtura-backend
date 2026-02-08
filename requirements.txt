@@ -1,0 +1,24 @@
+# Core API
+fastapi
+uvicorn
+
+# Database
+sqlalchemy
+psycopg2-binary
+alembic
+asyncpg
+
+# Authentication & Security
+python-jose[cryptography]
+passlib[bcrypt]
+
+# Configuration
+pydantic
+pydantic-settings
+python-dotenv
+
+# Scheduling & Background Jobs
+apscheduler
+
+# Real-time & Notifications
+websockets
