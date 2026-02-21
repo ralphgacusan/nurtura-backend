@@ -17,7 +17,7 @@ The system supports collaborative caregiving, reminders, analytics, and AI-assis
 - Secure login with authentication tokens
 - View and update caregiver profile information
 - Change password and manage security settings
-- Deactivate or remove caregiver accounts
+- Delete caregiver accounts
 
 ---
 

@@ -1,24 +1,60 @@
+"""
+requirements.txt
+
+This file lists all Python dependencies required for the FastAPI application.
+It includes dependencies for:
+
+- Core API functionality
+- Database access and migrations
+- Authentication and security
+- Configuration and settings management
+- Scheduling and background jobs
+- Real-time communication
+- File uploads and form handling
+
+Each dependency is commented to indicate its purpose.
+"""
+# ---------------------------
 # Core API
-fastapi
-uvicorn
+# ---------------------------
+fastapi                 # The main web framework
+uvicorn[standard]       # ASGI server for running FastAPI apps
 
+# ---------------------------
 # Database
-sqlalchemy
-psycopg2-binary
-alembic
-asyncpg
+# ---------------------------
+sqlalchemy              # ORM for interacting with SQL databases
+asyncpg                 # Async PostgreSQL driver (for SQLAlchemy async)
+psycopg2-binary         # PostgreSQL driver (synchronous, optional if using asyncpg)
+alembic                 # Database migrations tool
 
+# ---------------------------
 # Authentication & Security
-python-jose[cryptography]
-passlib[bcrypt]
+# ---------------------------
+python-jose[cryptography]   # JWT token creation and verification
+passlib[bcrypt]             # Password hashing using bcrypt
+# pwdlib[argon2]            # Optional: Argon2 password hashing (alternative to bcrypt)
+# pyjwt                      # Optional: JWT library (redundant if using python-jose)
 
-# Configuration
-pydantic
-pydantic-settings
-python-dotenv
+# ---------------------------
+# Configuration & Settings
+# ---------------------------
+pydantic                   # Data validation and settings management
+# pydantic[email]           # Not needed in Pydantic 2.x, EmailStr is included
+pydantic-settings           # Pydantic 2.x settings management for .env configs
+python-dotenv               # Load environment variables from .env files
 
+# ---------------------------
 # Scheduling & Background Jobs
-apscheduler
+# ---------------------------
+apscheduler                # Schedule tasks/jobs, e.g., reminders or periodic tasks
 
+# ---------------------------
 # Real-time & Notifications
-websockets
+# ---------------------------
+websockets                 # WebSocket support for real-time communication
+
+# ---------------------------
+# File uploads / Forms
+# ---------------------------
+python-multipart           # Required for form-data and file uploads in FastAPI
