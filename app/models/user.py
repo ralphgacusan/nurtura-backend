@@ -5,22 +5,40 @@ Defines the User SQLAlchemy model and associated enums.
 Users are the main actors in the system with roles, statuses,
 and linked refresh tokens for authentication.
 
+Fields:
+- user_id: Primary key.
+- first_name: User's first name.
+- middle_name: Optional middle name.
+- last_name: User's last name.
+- username: Unique username.
+- email: Optional unique email address.
+- password_hash: Hashed password.
+- role: UserRole enum.
+- sex: Sex enum.
+- birthdate: Optional birth date.
+- phone_number: Optional phone number.
+- status: UserStatus enum.
+- created_at: Timestamp of account creation.
+- updated_at: Timestamp of last update.
+
 Relationships:
-    - One-to-many with RefreshToken: a user can have multiple refresh tokens.
+- refresh_tokens: One-to-many with RefreshToken (user sessions).
+- dependent_profile: One-to-one with DependentProfile (for dependent users).
+- dependents: One-to-many with DependentProfile (for caregiver users).
 """
 
 # ---------------------------
 # Standard Library Imports
 # ---------------------------
-from datetime import datetime, timezone  # for timestamps
-import enum  # for user enums
+from datetime import datetime, timezone
+import enum
 
 # ---------------------------
 # SQLAlchemy Imports
 # ---------------------------
-from sqlalchemy import Column, Integer, String, Enum, DateTime
-from sqlalchemy.orm import relationship  # for model relationships
-from app.core.database import Base  # declarative base
+from sqlalchemy import Column, Integer, String, Enum, DateTime, Date
+from sqlalchemy.orm import relationship
+from app.core.database import Base
 
 # ---------------------------
 # User Enums
@@ -49,7 +67,7 @@ class UserStatus(str, enum.Enum):
 # ---------------------------
 class User(Base):
     """
-    SQLAlchemy model for users.
+    SQLAlchemy model representing a system user.
 
     Attributes:
         user_id (int): Primary key.
@@ -57,40 +75,67 @@ class User(Base):
         middle_name (str | None): Optional middle name.
         last_name (str): User's last name.
         username (str): Unique username.
-        email (str): Unique email address.
+        email (str | None): Unique email address.
         password_hash (str): Hashed password.
         role (UserRole): Role of the user.
         sex (Sex): Sex/gender of the user.
+        birthdate (date | None): Optional birth date.
         phone_number (str | None): Optional phone number.
         status (UserStatus): Account status.
-        created_at (datetime): Account creation timestamp.
-        updated_at (datetime): Last update timestamp.
+        created_at (datetime): Timestamp of account creation.
+        updated_at (datetime): Timestamp of last update.
         refresh_tokens (list[RefreshToken]): Linked refresh tokens.
+        dependent_profile (DependentProfile | None): Linked dependent profile (for dependent users).
+        dependents (list[DependentProfile]): Dependent profiles created by caregiver users.
     """
 
     __tablename__ = "users"
 
-    user_id = Column(Integer, primary_key=True, index=True)  # primary key
-    first_name = Column(String(50), nullable=False)  # first name
-    middle_name = Column(String(50), nullable=True)  # optional middle name
-    last_name = Column(String(50), nullable=False)  # last name
-    username = Column(String(50), nullable=False, unique=True, index=True)  # unique username
-    email = Column(String(100), nullable=False, unique=True, index=True)  # unique email
-    password_hash = Column(String(255), nullable=False)  # hashed password
-    role = Column(Enum(UserRole), nullable=False)  # role enum
-    sex = Column(Enum(Sex), nullable=False)  # sex enum
-    phone_number = Column(String(20), nullable=True)  # optional phone
-    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.active)  # account status
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))  # creation timestamp
+    # ---------------------------
+    # Columns
+    # ---------------------------
+    user_id = Column(Integer, primary_key=True, index=True)
+    first_name = Column(String(50), nullable=False)
+    middle_name = Column(String(50), nullable=True)
+    last_name = Column(String(50), nullable=False)
+    username = Column(String(50), nullable=False, unique=True, index=True)
+    email = Column(String(100), nullable=True, unique=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    role = Column(Enum(UserRole), nullable=False)
+    sex = Column(Enum(Sex), nullable=False)
+    birthdate = Column(Date, nullable=True)
+    phone_number = Column(String(20), nullable=True)
+    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.active)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),  # auto-update on modification
+        onupdate=lambda: datetime.now(timezone.utc),
     )
 
-    # One-to-many relationship to refresh tokens
+    # ---------------------------
+    # Relationships
+    # ---------------------------
+
+    # One-to-many: user -> refresh tokens
     refresh_tokens = relationship(
         "RefreshToken",
-        back_populates="user",  # matches `user` in RefreshToken model
-        cascade="all, delete-orphan"  # remove refresh tokens if user is deleted
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    # One-to-one: dependent user -> dependent profile
+    dependent_profile = relationship(
+        "DependentProfile",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        uselist=False,
+        foreign_keys="[DependentProfile.user_id]"
+    )
+
+    # One-to-many: caregiver -> dependent profiles
+    dependents = relationship(
+        "DependentProfile",
+        back_populates="caregiver",
+        foreign_keys="[DependentProfile.created_by]"
     )

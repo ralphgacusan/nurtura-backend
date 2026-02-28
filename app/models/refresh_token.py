@@ -1,60 +1,81 @@
 """
 models/refresh_token.py
 
-Defines the RefreshToken SQLAlchemy model.
-Refresh tokens maintain user sessions across devices and enable secure token refresh.
+This module defines the RefreshToken ORM model for SQLAlchemy.
+Refresh tokens are used to maintain user sessions across devices
+and allow secure generation of new access tokens.
+
+Fields:
+- token_id: Primary key for the refresh token
+- user_id: Foreign key linking to the owning user
+- token_hash: Secure hash of the refresh token
+- device_info: Optional metadata about the device
+- ip_address: Optional IP address where token was issued
+- expires_at: Expiration datetime for the token
+- revoked: Boolean flag indicating if the token is revoked
+- created_at: Timestamp when the token was created
+- revoked_at: Timestamp when the token was revoked (if applicable)
+- replaced_by_token_id: Reference to another RefreshToken that replaced this one (token rotation)
 
 Relationships:
-    - Each RefreshToken belongs to a User.
+- user: Many-to-one relationship with the owning User
 """
 
 # ---------------------------
 # Standard Library Imports
 # ---------------------------
-from datetime import datetime, timezone  # for timestamping and timezone-aware dates
+from datetime import datetime, timezone  # for timezone-aware timestamps
 
 # ---------------------------
 # SQLAlchemy Imports
 # ---------------------------
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey
-from sqlalchemy.orm import relationship  # for model relationships
+from sqlalchemy.orm import relationship
 
 # ---------------------------
-# Local Application Imports
+# Local App Imports
 # ---------------------------
-from app.core.database import Base  # SQLAlchemy declarative base
+from app.core.database import Base  # Declarative base for ORM models
 
-
+# ---------------------------
+# RefreshToken Model
+# ---------------------------
 class RefreshToken(Base):
-    """
-    SQLAlchemy model representing a refresh token.
-
-    Attributes:
-        token_id (int): Primary key.
-        user_id (int): FK to User table.
-        token_hash (str): Hashed token for secure storage.
-        device_info (str | None): Optional info about the device.
-        ip_address (str | None): Optional IP where token was issued.
-        expires_at (datetime): Expiration timestamp.
-        revoked (bool): Indicates if token is revoked.
-        created_at (datetime): Creation timestamp.
-        revoked_at (datetime | None): Revocation timestamp if revoked.
-        replaced_by_token_id (int | None): Token ID that replaced this one.
-        user (User): Relationship to the associated User.
-    """
-
     __tablename__ = "refresh_tokens"
 
-    token_id = Column(Integer, primary_key=True, index=True)  # primary key
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)  # FK to users table
-    token_hash = Column(String(255), nullable=False)  # store SHA256 hash of token
-    device_info = Column(String(100), nullable=True)  # optional device metadata
-    ip_address = Column(String(45), nullable=True)  # optional IP address
-    expires_at = Column(DateTime(timezone=True), nullable=False)  # token expiration
-    revoked = Column(Boolean, default=False)  # token revocation status
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))  # creation timestamp
-    revoked_at = Column(DateTime(timezone=True), nullable=True)  # timestamp when revoked
-    replaced_by_token_id = Column(Integer, ForeignKey("refresh_tokens.token_id"), nullable=True)  # rotation reference
+    # Primary key
+    token_id = Column(Integer, primary_key=True, index=True)
 
-    # Relationship to the User model
-    user = relationship("User", back_populates="refresh_tokens")  # link token to its owner
+    # FK to the owning user
+    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+
+    # Secure hash of the refresh token
+    token_hash = Column(String(255), nullable=False)
+
+    # Optional device information (e.g., browser, device type)
+    device_info = Column(String(100), nullable=True)
+
+    # Optional IP address where token was issued
+    ip_address = Column(String(45), nullable=True)
+
+    # Expiration datetime of the token
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    # Revocation status
+    revoked = Column(Boolean, default=False)
+
+    # Creation timestamp (UTC)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    # Revocation timestamp (if revoked)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    # Reference to the token that replaced this one (token rotation)
+    replaced_by_token_id = Column(Integer, ForeignKey("refresh_tokens.token_id"), nullable=True)
+
+    # ---------------------------
+    # Relationships
+    # ---------------------------
+
+    # Owner of this refresh token
+    user = relationship("User", back_populates="refresh_tokens")

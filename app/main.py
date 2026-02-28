@@ -19,6 +19,7 @@ from fastapi import FastAPI  # core FastAPI class to create the app instance
 # ---------------------------
 from app.api.v1.routers.auth import router as auth_router  # auth routes (login, refresh, logout)
 from app.api.v1.routers.user import router as user_router  # user management routes (register, profile)
+from app.api.v1.routers.dependent_profile import router as dependent_profile_router  # dependent profile routes
 from app.core.config import settings  # project configuration, including API prefix
 
 # ---------------------------
@@ -26,7 +27,9 @@ from app.core.config import settings  # project configuration, including API pre
 # ---------------------------
 api_prefix = settings.API_PREFIX  # dynamic prefix (e.g., "/api/v1") from config
 
-# Initialize FastAPI app instance
+# ---------------------------
+# Initialize FastAPI App
+# ---------------------------
 app = FastAPI(
     title="Nurtura API",
     description=(
@@ -40,19 +43,24 @@ app = FastAPI(
 # ---------------------------
 # Include Routers
 # ---------------------------
-# Authentication routes (login, token, logout)
-app.include_router(auth_router, prefix=f"{api_prefix}/auth")
+# Authentication routes (login, refresh, logout)
+app.include_router(auth_router, prefix=f"{api_prefix}/auth", tags=["auth"])
 
 # User management routes (register, profile, update, delete)
-app.include_router(user_router, prefix=f"{api_prefix}/users")
+app.include_router(user_router, prefix=f"{api_prefix}/users", tags=["users"])
+
+# Dependent profile routes (create, read, update, delete)
+app.include_router(dependent_profile_router, prefix=f"{api_prefix}/dependent-profiles", tags=["dependent_profiles"])
 
 # ---------------------------
-# Health Check / Test Endpoint
+# Health Check Endpoint
 # ---------------------------
 @app.get(f"{api_prefix}/ping", tags=["health"])
 async def ping():
     """
     Simple endpoint to verify that the API is running.
-    Returns a static response {"ping": "pong"} for monitoring.
+
+    Returns:
+        dict: Static response {"ping": "pong"} for monitoring.
     """
     return {"ping": "pong"}

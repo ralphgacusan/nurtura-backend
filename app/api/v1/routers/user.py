@@ -51,10 +51,14 @@ async def register(
     user_service: Annotated[UserService, Depends(get_user_service)],  # Inject UserService
 ):
     """
-    Handle user registration.
+    Register a new user account.
+
+    - Accepts a UserCreate schema with all required registration fields.
+    - Returns the created user profile.
+    - Raises an exception if the username or email already exists.
     """
-    db_user = await user_service.register(user)  # Call service to create user
-    return db_user  # Return newly created user
+    db_user = await user_service.register(user)
+    return db_user
 
 
 # ---------------------------
@@ -70,9 +74,12 @@ async def read_current_user(
     user_service: Annotated[UserService, Depends(get_user_service)],  # Inject UserService
 ):
     """
-    Return current user's profile.
+    Retrieve the profile of the currently authenticated user.
+
+    - Returns a UserRead schema with user details.
+    - Raises 404 if the user is not found (should not happen for an active token).
     """
-    return await user_service.get_account(current_user.user_id)  # Fetch user info
+    return await user_service.get_account(current_user.user_id)
 
 
 # ---------------------------
@@ -89,9 +96,13 @@ async def update_current_user(
     user_service: Annotated[UserService, Depends(get_user_service)],
 ):
     """
-    Update user account with provided fields.
+    Update fields of the currently authenticated user's account.
+
+    - Only fields provided in the request will be updated.
+    - Returns the updated UserRead schema.
+    - Raises an exception if username or email conflicts with another account.
     """
-    return await user_service.update_account(current_user.user_id, updates)  # Update via service
+    return await user_service.update_account(current_user.user_id, updates)
 
 
 # ---------------------------
@@ -107,10 +118,13 @@ async def change_password(
     user_service: Annotated[UserService, Depends(get_user_service)],
 ):
     """
-    Update user's password after verifying current password.
+    Change the password for the currently authenticated user.
+
+    - Verifies the current password before applying the new password.
+    - Returns confirmation upon success.
+    - Raises an exception if current password is invalid.
     """
-    await user_service.change_password(current_user.user_id, payload)  # Delegate to service
-    return {"detail": "Password updated successfully."}  # Success message
+    return await user_service.change_password(current_user.user_id, payload)
 
 
 # ---------------------------
@@ -125,7 +139,9 @@ async def delete_current_user(
     user_service: Annotated[UserService, Depends(get_user_service)],
 ):
     """
-    Delete user account permanently.
+    Permanently delete the currently authenticated user's account.
+
+    - Returns a confirmation message upon successful deletion.
+    - Raises an exception if the user cannot be deleted.
     """
-    await user_service.delete_account(current_user.user_id)  # Delete via service
-    return {"detail": "Your account has been deleted successfully."}  # Confirmation message
+    return await user_service.delete_account(current_user.user_id)

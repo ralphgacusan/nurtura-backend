@@ -4,25 +4,27 @@ repositories/user.py
 This module defines the UserRepository for performing CRUD operations
 on the User model using an asynchronous SQLAlchemy session.
 
-Features:
+Responsibilities:
 - Create new users
-- Read users by ID, username, email
+- Retrieve users by ID, username, or email
 - Update user information
+- Change user password
 - Delete users
 """
 
 # ---------------------------
 # SQLAlchemy Imports
 # ---------------------------
-from sqlalchemy.ext.asyncio import AsyncSession  # async database session
-from sqlalchemy import select, update, delete   # query constructs
+from sqlalchemy.ext.asyncio import AsyncSession  # async DB session
+from sqlalchemy import select  # query construct
 
 # ---------------------------
 # Local App Imports
 # ---------------------------
-from app.models import User  # User SQLAlchemy model
-from app.schemas.user import UserCreate, UserUpdate  # Pydantic schemas
-from app.core.security import get_password_hash  # password hashing utility
+from app.models import User
+from app.schemas.user import PasswordChange, UserCreate, UserUpdate
+from app.core.security import get_password_hash, verify_password
+from app.core.exceptions import user_not_found_exception, invalid_credentials_exception
 
 # ---------------------------
 # User Repository
@@ -30,18 +32,34 @@ from app.core.security import get_password_hash  # password hashing utility
 class UserRepository:
     """
     Repository for managing User database operations.
+
+    Attributes:
+        db (AsyncSession): Asynchronous SQLAlchemy session.
     """
 
     def __init__(self, db: AsyncSession):
-        self.db = db  # store async database session
+        """
+        Initialize the repository with a database session.
 
-    # -----------------------
+        Args:
+            db (AsyncSession): Async database session.
+        """
+        self.db = db
+
+    # ---------------------------
     # CREATE
-    # -----------------------
+    # ---------------------------
     async def create_user(self, user: UserCreate) -> User:
         """
         Create a new user in the database.
-        Password is hashed before storing.
+
+        The password is hashed before storage.
+
+        Args:
+            user (UserCreate): Pydantic schema containing new user data.
+
+        Returns:
+            User: Newly created user instance.
         """
         db_user = User(
             first_name=user.first_name,
@@ -51,21 +69,26 @@ class UserRepository:
             email=user.email,
             role=user.role,
             sex=user.sex,
+            birthdate=user.birthdate,
             phone_number=user.phone_number,
-            password_hash=get_password_hash(user.password),  # hash password before saving
+            password_hash=get_password_hash(user.password),
         )
-        self.db.add(db_user)       # stage new user
-        await self.db.commit()     # persist to DB
-        await self.db.refresh(db_user)  # refresh to get generated ID and timestamps
+        self.db.add(db_user)
+        await self.db.flush()
         return db_user
 
-    # -----------------------
+    # ---------------------------
     # READ
-    # -----------------------
+    # ---------------------------
     async def get_by_id(self, user_id: int) -> User | None:
         """
         Retrieve a user by their unique ID.
-        Returns None if not found.
+
+        Args:
+            user_id (int): ID of the user.
+
+        Returns:
+            User | None: User instance if found, else None.
         """
         result = await self.db.execute(select(User).where(User.user_id == user_id))
         return result.scalars().first()
@@ -73,6 +96,12 @@ class UserRepository:
     async def get_by_username(self, username: str) -> User | None:
         """
         Retrieve a user by their unique username.
+
+        Args:
+            username (str): Username of the user.
+
+        Returns:
+            User | None: User instance if found, else None.
         """
         result = await self.db.execute(select(User).where(User.username == username))
         return result.scalars().first()
@@ -80,45 +109,95 @@ class UserRepository:
     async def get_by_email(self, email: str) -> User | None:
         """
         Retrieve a user by their unique email address.
+
+        Args:
+            email (str): Email address of the user.
+
+        Returns:
+            User | None: User instance if found, else None.
         """
         result = await self.db.execute(select(User).where(User.email == email))
         return result.scalars().first()
 
-    # -----------------------
+    # ---------------------------
     # UPDATE
-    # -----------------------
+    # ---------------------------
     async def update_user(self, user_id: int, updates: UserUpdate) -> User | None:
         """
         Update user information.
-        If password is provided, it is hashed before storing.
-        """
-        user = await self.get_by_id(user_id)  # fetch user first
-        if not user:
-            return None  # user not found
 
-        # Apply updates dynamically
-        for field, value in updates.dict(exclude_unset=True).items():
-            if field == "password":
-                setattr(user, "password_hash", get_password_hash(value))  # hash password
-            else:
-                setattr(user, field, value)  # set other fields
+        If a password is provided, it is hashed before storage.
 
-        self.db.add(user)       # stage changes
-        await self.db.commit()  # persist updates
-        await self.db.refresh(user)  # refresh to get latest data
-        return user
+        Args:
+            user_id (int): ID of the user to update.
+            updates (UserUpdate): Pydantic schema with updated fields.
 
-    # -----------------------
-    # DELETE
-    # -----------------------
-    async def delete_user(self, user_id: int) -> bool:
-        """
-        Delete a user by ID.
-        Returns True if deletion was successful, False if user was not found.
+        Returns:
+            User | None: Updated user instance, or None if user not found.
         """
         user = await self.get_by_id(user_id)
         if not user:
-            return False  # user does not exist
-        await self.db.delete(user)  # delete user
-        await self.db.commit()      # commit deletion
+            return None
+
+        for field, value in updates.model_dump(exclude_unset=True).items():
+            if field == "password":
+                setattr(user, "password_hash", get_password_hash(value))
+            else:
+                setattr(user, field, value)
+
+        self.db.add(user)
+        await self.db.commit()
+        await self.db.refresh(user)
+        return user
+
+    # ---------------------------
+    # CHANGE PASSWORD
+    # ---------------------------
+    async def change_password(self, user_id: int, payload: PasswordChange) -> dict:
+        """
+        Verify the current password and update to a new password.
+
+        Args:
+            user_id (int): ID of the user.
+            payload (PasswordChange): Contains current and new passwords.
+
+        Raises:
+            user_not_found_exception: If user does not exist.
+            invalid_credentials_exception: If current password does not match.
+
+        Returns:
+            dict: Success message upon password change.
+        """
+        user = await self.get_by_id(user_id)
+        if not user:
+            raise user_not_found_exception
+
+        if not verify_password(payload.current_password, user.password_hash):
+            raise invalid_credentials_exception
+
+        user.password_hash = get_password_hash(payload.new_password)
+        self.db.add(user)
+        await self.db.commit()
+        await self.db.refresh(user)
+
+        return {"detail": "Password updated successfully."}
+
+    # ---------------------------
+    # DELETE
+    # ---------------------------
+    async def delete_user(self, user_id: int) -> bool:
+        """
+        Delete a user by their ID.
+
+        Args:
+            user_id (int): ID of the user to delete.
+
+        Returns:
+            bool: True if deletion was successful, False if user not found.
+        """
+        user = await self.get_by_id(user_id)
+        if not user:
+            return False
+        await self.db.delete(user)
+        await self.db.commit()
         return True
