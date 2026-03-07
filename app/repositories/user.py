@@ -1,65 +1,41 @@
 """
 repositories/user.py
 
-This module defines the UserRepository for performing CRUD operations
-on the User model using an asynchronous SQLAlchemy session.
-
-Responsibilities:
-- Create new users
-- Retrieve users by ID, username, or email
-- Update user information
-- Change user password
-- Delete users
+Repository for managing User ORM objects.
+Provides CRUD operations, password management, and queries by username/email.
 """
 
-# ---------------------------
-# SQLAlchemy Imports
-# ---------------------------
-from sqlalchemy.ext.asyncio import AsyncSession  # async DB session
-from sqlalchemy import select  # query construct
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
-# ---------------------------
-# Local App Imports
-# ---------------------------
-from app.models import User
-from app.schemas.user import PasswordChange, UserCreate, UserUpdate
-from app.core.security import get_password_hash, verify_password
-from app.core.exceptions import user_not_found_exception, invalid_credentials_exception
+from app.models.user import User
+from app.schemas.user import UserCreate, UserUpdate
+from app.core.security import get_password_hash
 
-# ---------------------------
-# User Repository
-# ---------------------------
+
 class UserRepository:
     """
-    Repository for managing User database operations.
+    Repository for interacting with User records in the database.
 
-    Attributes:
-        db (AsyncSession): Asynchronous SQLAlchemy session.
+    Args:
+        db (AsyncSession): SQLAlchemy asynchronous session.
     """
 
     def __init__(self, db: AsyncSession):
-        """
-        Initialize the repository with a database session.
-
-        Args:
-            db (AsyncSession): Async database session.
-        """
-        self.db = db
+        self.db = db  # store async session for DB operations
 
     # ---------------------------
     # CREATE
     # ---------------------------
     async def create_user(self, user: UserCreate) -> User:
         """
-        Create a new user in the database.
-
-        The password is hashed before storage.
+        Create a new user in the database with hashed password.
 
         Args:
             user (UserCreate): Pydantic schema containing new user data.
 
         Returns:
-            User: Newly created user instance.
+            User: Newly created user instance with primary key assigned.
         """
         db_user = User(
             first_name=user.first_name,
@@ -71,10 +47,10 @@ class UserRepository:
             sex=user.sex,
             birthdate=user.birthdate,
             phone_number=user.phone_number,
-            password_hash=get_password_hash(user.password),
+            password_hash=get_password_hash(user.password),  # hash password before storing
         )
         self.db.add(db_user)
-        await self.db.flush()
+        await self.db.flush()  # flush to assign primary key
         return db_user
 
     # ---------------------------
@@ -85,7 +61,7 @@ class UserRepository:
         Retrieve a user by their unique ID.
 
         Args:
-            user_id (int): ID of the user.
+            user_id (int): Primary key of the user.
 
         Returns:
             User | None: User instance if found, else None.
@@ -111,7 +87,7 @@ class UserRepository:
         Retrieve a user by their unique email address.
 
         Args:
-            email (str): Email address of the user.
+            email (str): Email of the user.
 
         Returns:
             User | None: User instance if found, else None.
@@ -124,16 +100,14 @@ class UserRepository:
     # ---------------------------
     async def update_user(self, user_id: int, updates: UserUpdate) -> User | None:
         """
-        Update user information.
-
-        If a password is provided, it is hashed before storage.
+        Update user information. Hash the password if it is updated.
 
         Args:
             user_id (int): ID of the user to update.
             updates (UserUpdate): Pydantic schema with updated fields.
 
         Returns:
-            User | None: Updated user instance, or None if user not found.
+            User | None: Updated user, or None if not found.
         """
         user = await self.get_by_id(user_id)
         if not user:
@@ -141,9 +115,9 @@ class UserRepository:
 
         for field, value in updates.model_dump(exclude_unset=True).items():
             if field == "password":
-                setattr(user, "password_hash", get_password_hash(value))
+                setattr(user, "password_hash", get_password_hash(value))  # hash new password
             else:
-                setattr(user, field, value)
+                setattr(user, field, value)  # update other fields
 
         self.db.add(user)
         await self.db.commit()
@@ -153,34 +127,22 @@ class UserRepository:
     # ---------------------------
     # CHANGE PASSWORD
     # ---------------------------
-    async def change_password(self, user_id: int, payload: PasswordChange) -> dict:
+    async def change_password(self, user_id: int, new_hashed_password: str) -> User:
         """
-        Verify the current password and update to a new password.
+        Update a user's password with a pre-hashed value.
 
         Args:
             user_id (int): ID of the user.
-            payload (PasswordChange): Contains current and new passwords.
-
-        Raises:
-            user_not_found_exception: If user does not exist.
-            invalid_credentials_exception: If current password does not match.
+            new_hashed_password (str): Already hashed new password.
 
         Returns:
-            dict: Success message upon password change.
+            User: User instance with updated password hash.
         """
         user = await self.get_by_id(user_id)
-        if not user:
-            raise user_not_found_exception
-
-        if not verify_password(payload.current_password, user.password_hash):
-            raise invalid_credentials_exception
-
-        user.password_hash = get_password_hash(payload.new_password)
-        self.db.add(user)
+        user.password_hash = new_hashed_password  # directly set hashed password
         await self.db.commit()
         await self.db.refresh(user)
-
-        return {"detail": "Password updated successfully."}
+        return user
 
     # ---------------------------
     # DELETE
@@ -193,7 +155,7 @@ class UserRepository:
             user_id (int): ID of the user to delete.
 
         Returns:
-            bool: True if deletion was successful, False if user not found.
+            bool: True if deletion succeeded, False if user not found.
         """
         user = await self.get_by_id(user_id)
         if not user:

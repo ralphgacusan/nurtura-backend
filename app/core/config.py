@@ -2,39 +2,40 @@
 core/config.py
 
 This module defines application settings using Pydantic's BaseSettings.
-It centralizes all environment variables and configuration values,
-making it easy to access them across the project in a type-safe way.
 
 Features:
+- Centralizes environment variables and configuration values
 - Database connection configuration
 - JWT / authentication secrets and expiration times
-- Environment (development/production)
-- Computed properties such as DATABASE_URL
+- Environment configuration (development, production, etc.)
+- Computed properties such as DATABASE_URL for SQLAlchemy
 """
 
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings  # BaseSettings provides environment variable parsing and type validation
 
 class Settings(BaseSettings):
     """
-    Application configuration loaded from environment variables (.env).
+    Application configuration loaded from environment variables (.env file).
 
     Attributes:
-        ENV: Current environment ("development", "production", etc.)
-        DB_ENGINE: Database engine (e.g., "postgresql+asyncpg")
-        DB_HOST: Database host (IP or hostname)
-        DB_PORT: Database port (integer)
-        DB_NAME: Database name
-        DB_USER: Database username
-        DB_PASSWORD: Database password
-        ACCESS_SECRET_KEY: Secret key used to sign JWT access tokens
-        REFRESH_SECRET_KEY: Secret key used to sign JWT refresh tokens
-        ACCESS_TOKEN_EXPIRE_MINUTES: Lifetime of access tokens (in minutes)
-        REFRESH_TOKEN_EXPIRE_DAYS: Lifetime of refresh tokens (in days)
-        ALGORITHM: JWT signing algorithm (e.g., "HS256")
-        API_PREFIX: Base prefix for API routes
+        ENV (str): Current environment ("development", "production", etc.)
+        DB_ENGINE (str): Database engine (e.g., "postgresql+asyncpg")
+        DB_HOST (str): Database host (IP address or hostname)
+        DB_PORT (int): Database port
+        DB_NAME (str): Database name
+        DB_USER (str): Database username
+        DB_PASSWORD (str): Database password
+        ACCESS_SECRET_KEY (str): Secret key for signing JWT access tokens
+        REFRESH_SECRET_KEY (str): Secret key for signing JWT refresh tokens
+        ACCESS_TOKEN_EXPIRE_MINUTES (int): Access token lifetime in minutes
+        REFRESH_TOKEN_EXPIRE_DAYS (int): Refresh token lifetime in days
+        ALGORITHM (str): JWT signing algorithm (e.g., "HS256")
+        API_PREFIX (str): Base prefix for all API routes
+        CARE_SPACE_CODE_EXPIRE_HOURS (int): Number of hours before a care space join code expires
+        CARE_SPACE_CODE_LENGTH (int): Length of generated care space join codes
     """
 
-    ENV: str = "development"
+    ENV: str = "development"  # Default environment
 
     # -------------------------
     # DATABASE CONFIGURATION
@@ -61,6 +62,12 @@ class Settings(BaseSettings):
     API_PREFIX: str
 
     # -------------------------
+    # CARE SPACE JOIN CODE CONFIGURATION
+    # -------------------------
+    CARE_SPACE_CODE_EXPIRE_HOURS: int  # Hours before a generated join code expires
+    CARE_SPACE_CODE_LENGTH: int        # Length of the join code
+
+    # -------------------------
     # Computed Properties
     # -------------------------
     @property
@@ -82,16 +89,16 @@ class Settings(BaseSettings):
 
     class Config:
         """
-        Pydantic configuration class.
+        Pydantic configuration class for Settings.
 
-        Automatically loads environment variables from a .env file
-        and ensures proper encoding.
+        - Automatically loads environment variables from a .env file
+        - Ensures proper file encoding
         """
-        env_file = ".env"                # Load environment variables from .env
-        env_file_encoding = "utf-8"      # Specify file encoding
+        env_file = ".env"                # Path to .env file
+        env_file_encoding = "utf-8"      # Encoding for .env file
 
 # -------------------------
 # Create a global settings instance
 # -------------------------
-# Import this instance anywhere in the project to access settings
+# Import this instance anywhere in the project to access configuration values
 settings = Settings()

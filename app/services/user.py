@@ -1,10 +1,9 @@
-# services/user.py
-
 """
-Service layer for managing User operations.
-Includes registration, account retrieval, updates, password changes, and deletion.
+services/user_service.py
 
-Features:
+Service layer for managing User operations.
+
+Responsibilities:
 - Register new users
 - Retrieve user account
 - Update user account with uniqueness checks
@@ -15,16 +14,16 @@ Features:
 # ---------------------------
 # Local App Imports
 # ---------------------------
-from app.repositories.user import UserRepository  # user database CRUD
-from app.schemas.user import UserCreate, UserUpdate, PasswordChange  # input schemas
-from app.models.user import User  # user ORM model
+from app.repositories.user import UserRepository
+from app.schemas.user import UserCreate, UserUpdate, PasswordChange
+from app.models.user import User
 from app.core.exceptions import (
-    user_not_found_exception,  # 404 when user doesn't exist
-    email_already_exists_exception,  # 400 for duplicate email
-    username_already_exists_exception,  # 400 for duplicate username
-    invalid_credentials_exception  # 401 for wrong password
+    user_not_found_exception,
+    email_already_exists_exception,
+    username_already_exists_exception,
+    invalid_credentials_exception,
 )
-from app.core.security import verify_password, get_password_hash  # compare plaintext vs hashed passwords
+from app.core.security import verify_password, get_password_hash
 
 # ---------------------------
 # User Service Class
@@ -35,11 +34,11 @@ class UserService:
     """
 
     def __init__(self, user_repo: UserRepository):
-        self.user_repo = user_repo  # inject user repository
+        self.user_repo = user_repo
 
-    # -----------------------
-    # Register / Create User
-    # -----------------------
+    # ---------------------------
+    # REGISTER NEW USER
+    # ---------------------------
     async def register(self, user_data: UserCreate) -> User:
         """
         Register a new user after validating unique email and username.
@@ -49,7 +48,7 @@ class UserService:
             username_already_exists_exception
 
         Returns:
-            User: The newly created user instance.
+            User: Newly created user instance.
         """
         if await self.user_repo.get_by_email(user_data.email):
             raise email_already_exists_exception
@@ -57,11 +56,13 @@ class UserService:
         if await self.user_repo.get_by_username(user_data.username):
             raise username_already_exists_exception
 
-        return await self.user_repo.create_user(user_data)
+        user = await self.user_repo.create_user(user_data)
+        await self.user_repo.db.commit()
+        return user
 
-    # -----------------------
-    # Get User Account
-    # -----------------------
+    # ---------------------------
+    # GET USER ACCOUNT
+    # ---------------------------
     async def get_account(self, user_id: int) -> User:
         """
         Retrieve a user's account by ID.
@@ -70,16 +71,16 @@ class UserService:
             user_not_found_exception
 
         Returns:
-            User: The requested user.
+            User: The requested user instance.
         """
         user = await self.user_repo.get_by_id(user_id)
         if not user:
             raise user_not_found_exception
         return user
 
-    # -----------------------
-    # Update User Account
-    # -----------------------
+    # ---------------------------
+    # UPDATE USER ACCOUNT
+    # ---------------------------
     async def update_account(self, user_id: int, updates: UserUpdate) -> User:
         """
         Update user fields with validation for unique email and username.
@@ -90,13 +91,15 @@ class UserService:
             user_not_found_exception
 
         Returns:
-            User: The updated user.
+            User: Updated user instance.
         """
+        # Check uniqueness of email
         if updates.email:
             existing_email_user = await self.user_repo.get_by_email(updates.email)
             if existing_email_user and existing_email_user.user_id != user_id:
                 raise email_already_exists_exception
 
+        # Check uniqueness of username
         if updates.username:
             existing_username_user = await self.user_repo.get_by_username(updates.username)
             if existing_username_user and existing_username_user.user_id != user_id:
@@ -105,14 +108,15 @@ class UserService:
         user = await self.user_repo.update_user(user_id, updates)
         if not user:
             raise user_not_found_exception
+
         return user
 
-    # -----------------------
-    # Change User Password
-    # -----------------------
+    # ---------------------------
+    # CHANGE USER PASSWORD
+    # ---------------------------
     async def change_password(self, user_id: int, payload: PasswordChange) -> dict:
         """
-        Change the user's password after verifying the current password.
+        Change the user's password after verifying current password.
 
         Raises:
             user_not_found_exception
@@ -133,9 +137,9 @@ class UserService:
 
         return {"detail": "Password updated successfully."}
 
-    # -----------------------
-    # Delete User Account
-    # -----------------------
+    # ---------------------------
+    # DELETE USER ACCOUNT
+    # ---------------------------
     async def delete_account(self, user_id: int) -> dict:
         """
         Delete a user's account.

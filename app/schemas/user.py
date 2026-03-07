@@ -1,13 +1,14 @@
 """
 schemas/user.py
 
-This module defines Pydantic schemas for User-related operations.
+Pydantic schemas for User operations.
+Includes creation, login, reading, updating, and password change.
 
 Features:
-- Base user schema for shared fields
-- User creation with strong password validation
-- User login schema
-- User read and update schemas
+- Base user schema
+- User creation with password validation
+- Login schema
+- Read and update schemas
 - Password change schema
 """
 
@@ -15,13 +16,13 @@ Features:
 # Standard Library Imports
 # ---------------------------
 from datetime import datetime, date
-import re  # for password strength validation
+import re  # For password strength validation
 
 # ---------------------------
 # Pydantic Imports
 # ---------------------------
 from pydantic import BaseModel, EmailStr, Field, field_validator
-from typing import Annotated
+from typing import Annotated, Optional
 
 # ---------------------------
 # Local App Imports
@@ -36,14 +37,14 @@ name_regex = r"^[A-Za-zÀ-ÖØ-öø-ÿ\s'-]+$"  # letters, spaces, hyphens, apos
 # ---------------------------
 # Shared Validation Functions
 # ---------------------------
-def validate_birthdate_not_future(value: date | None) -> date | None:
+def validate_birthdate_not_future(value: Optional[date]) -> Optional[date]:
     """Raise ValueError if birthdate is in the future."""
     if value and value > date.today():
         raise ValueError("Birthdate cannot be in the future")
     return value
 
 def validate_password_strength(value: str) -> str:
-    """Validate password strength: must include uppercase, lowercase, special character."""
+    """Ensure password contains uppercase, lowercase, and special character."""
     if not re.search(r"[A-Z]", value):
         raise ValueError("Password must contain at least one uppercase letter")
     if not re.search(r"[a-z]", value):
@@ -53,28 +54,28 @@ def validate_password_strength(value: str) -> str:
     return value
 
 # ---------------------------
-# Base User Schema
+# BASE USER SCHEMA
 # ---------------------------
 class UserBase(BaseModel):
     """
     Base schema shared by user creation, read, and update schemas.
 
-    Fields:
+    Attributes:
         first_name (str): Required first name (1-50 chars, letters only)
         middle_name (str | None): Optional middle name (max 50 chars)
         last_name (str): Required last name (1-50 chars)
         username (str): Unique username (3-50 chars, letters/numbers/underscores)
-        email (EmailStr | None): Optional email address
-        role (UserRole): Role of the user (admin/caregiver/dependent)
-        sex (Sex): Sex/gender of the user
-        birthdate (date | None): Optional birthdate (cannot be in future)
+        email (EmailStr | None): Optional email
+        role (UserRole): User role (family_member/caregiver/dependent)
+        sex (Sex): Sex/gender
+        birthdate (date | None): Optional; cannot be in future
         phone_number (str | None): Optional phone number (international format)
     """
     first_name: Annotated[
         str, Field(min_length=1, max_length=50, pattern=name_regex, strip_whitespace=True)
     ]
     middle_name: Annotated[
-        str | None, Field(max_length=50, pattern=name_regex, strip_whitespace=True)
+        Optional[str], Field(max_length=50, pattern=name_regex, strip_whitespace=True)
     ] = None
     last_name: Annotated[
         str, Field(min_length=1, max_length=50, pattern=name_regex, strip_whitespace=True)
@@ -82,26 +83,33 @@ class UserBase(BaseModel):
     username: Annotated[
         str, Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")
     ]
-    email: EmailStr | None = None
+    email: Optional[EmailStr] = None
     role: UserRole
     sex: Sex
-    birthdate: date | None = None
-    phone_number: Annotated[str | None, Field(pattern=r"^\+?\d{7,20}$")] = None
+    birthdate: Optional[date] = None
+    phone_number: Annotated[Optional[str], Field(pattern=r"^\+?\d{7,20}$")] = None
 
     @field_validator("birthdate")
     @classmethod
-    def validate_birthdate(cls, birthdate_value: date | None) -> date | None:
+    def validate_birthdate(cls, birthdate_value: Optional[date]) -> Optional[date]:
         """Ensure birthdate is not in the future."""
         return validate_birthdate_not_future(birthdate_value)
 
+    @field_validator("middle_name", mode="before")
+    @classmethod
+    def empty_to_none(cls, v):
+        if v == "":
+            return None
+        return v
+
 # ---------------------------
-# Login Schema
+# LOGIN SCHEMA
 # ---------------------------
 class UserLogin(BaseModel):
     """
     Schema for user login requests.
 
-    Fields:
+    Attributes:
         username (str): Login username
         password (str): Login password
     """
@@ -109,13 +117,13 @@ class UserLogin(BaseModel):
     password: Annotated[str, Field(min_length=8)]
 
 # ---------------------------
-# User Creation Schema
+# USER CREATION SCHEMA
 # ---------------------------
 class UserCreate(UserBase):
     """
     Schema for creating a new user with password validation.
 
-    Fields:
+    Attributes:
         password (str): Required password (8-128 chars, must meet strength criteria)
     """
     password: Annotated[str, Field(min_length=8, max_length=128)]
@@ -126,16 +134,16 @@ class UserCreate(UserBase):
         return validate_password_strength(password_value)
 
 # ---------------------------
-# User Read Schema
+# USER READ SCHEMA
 # ---------------------------
 class UserRead(UserBase):
     """
     Schema for reading user information.
 
-    Fields:
+    Attributes:
         user_id (int): Primary key
         status (UserStatus): Current account status
-        created_at (datetime): Timestamp of account creation
+        created_at (datetime): Timestamp of creation
         updated_at (datetime): Timestamp of last update
     """
     user_id: int
@@ -144,11 +152,11 @@ class UserRead(UserBase):
     updated_at: datetime
 
     model_config = {
-        "from_attributes": True  # ORM mode
+        "from_attributes": True  # Enables ORM mode
     }
 
 # ---------------------------
-# User Update Schema
+# USER UPDATE SCHEMA
 # ---------------------------
 class UserUpdate(BaseModel):
     """
@@ -156,31 +164,46 @@ class UserUpdate(BaseModel):
 
     All fields are optional.
 
-    Fields:
+    Attributes:
         first_name (str | None)
         middle_name (str | None)
         last_name (str | None)
         username (str | None)
         email (EmailStr | None)
         sex (Sex | None)
+        birthdate (date | None)
         phone_number (str | None)
     """
-    first_name: Annotated[str | None, Field(min_length=1, max_length=50, pattern=name_regex, strip_whitespace=True)] = None
-    middle_name: Annotated[str | None, Field(max_length=50, pattern=name_regex, strip_whitespace=True)] = None
-    last_name: Annotated[str | None, Field(min_length=1, max_length=50, pattern=name_regex, strip_whitespace=True)] = None
-    username: Annotated[str | None, Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")] = None
-    email: EmailStr | None = None
-    sex: Sex | None = None
-    phone_number: Annotated[str | None, Field(pattern=r"^\+?\d{7,20}$")] = None
+    first_name: Annotated[Optional[str], Field(min_length=1, max_length=50, pattern=name_regex, strip_whitespace=True)] = None
+    middle_name: Annotated[Optional[str], Field(max_length=50, pattern=name_regex, strip_whitespace=True)] = None
+    last_name: Annotated[Optional[str], Field(min_length=1, max_length=50, pattern=name_regex, strip_whitespace=True)] = None
+    username: Annotated[Optional[str], Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_]+$")] = None
+    email: Optional[EmailStr] = None
+    sex: Optional[Sex] = None
+    birthdate: Optional[date] = None
+    phone_number: Annotated[Optional[str], Field(pattern=r"^\+?\d{7,20}$")] = None
+
+    @field_validator("birthdate")
+    @classmethod
+    def validate_birthdate(cls, birthdate_value: Optional[date]) -> Optional[date]:
+        """Ensure birthdate is not in the future."""
+        return validate_birthdate_not_future(birthdate_value)
+
+    @field_validator("middle_name", mode="before")
+    @classmethod
+    def empty_to_none(cls, v):
+        if v == "":
+            return None
+        return v
 
 # ---------------------------
-# Password Change Schema
+# PASSWORD CHANGE SCHEMA
 # ---------------------------
 class PasswordChange(BaseModel):
     """
     Schema for changing a user's password.
 
-    Fields:
+    Attributes:
         current_password (str): Current password for verification
         new_password (str): New password (8-128 chars, must meet strength criteria)
     """

@@ -25,12 +25,14 @@ Relationships:
 - refresh_tokens: One-to-many with RefreshToken (user sessions).
 - dependent_profile: One-to-one with DependentProfile (for dependent users).
 - dependents: One-to-many with DependentProfile (for caregiver users).
+- created_care_spaces: One-to-many with CareSpace (as creator).
+- care_space_memberships: One-to-many with CareSpaceMember (as member).
 """
 
 # ---------------------------
 # Standard Library Imports
 # ---------------------------
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 import enum
 
 # ---------------------------
@@ -47,7 +49,7 @@ class UserRole(str, enum.Enum):
     """User roles in the system."""
     caregiver = "caregiver"
     dependent = "dependent"
-    admin = "admin"
+    family_member = "family_member"
 
 class Sex(str, enum.Enum):
     """Sex/gender of the user."""
@@ -75,7 +77,7 @@ class User(Base):
         middle_name (str | None): Optional middle name.
         last_name (str): User's last name.
         username (str): Unique username.
-        email (str | None): Unique email address.
+        email (str | None): Optional unique email address.
         password_hash (str): Hashed password.
         role (UserRole): Role of the user.
         sex (Sex): Sex/gender of the user.
@@ -87,6 +89,8 @@ class User(Base):
         refresh_tokens (list[RefreshToken]): Linked refresh tokens.
         dependent_profile (DependentProfile | None): Linked dependent profile (for dependent users).
         dependents (list[DependentProfile]): Dependent profiles created by caregiver users.
+        created_care_spaces (list[CareSpace]): Care spaces created by this user.
+        care_space_memberships (list[CareSpaceMember]): Memberships in care spaces.
     """
 
     __tablename__ = "users"
@@ -94,48 +98,61 @@ class User(Base):
     # ---------------------------
     # Columns
     # ---------------------------
-    user_id = Column(Integer, primary_key=True, index=True)
-    first_name = Column(String(50), nullable=False)
-    middle_name = Column(String(50), nullable=True)
-    last_name = Column(String(50), nullable=False)
-    username = Column(String(50), nullable=False, unique=True, index=True)
-    email = Column(String(100), nullable=True, unique=True, index=True)
-    password_hash = Column(String(255), nullable=False)
-    role = Column(Enum(UserRole), nullable=False)
-    sex = Column(Enum(Sex), nullable=False)
-    birthdate = Column(Date, nullable=True)
-    phone_number = Column(String(20), nullable=True)
-    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.active)
-    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    user_id = Column(Integer, primary_key=True, index=True, doc="Primary key for the user")
+    first_name = Column(String(50), nullable=False, doc="First name of the user")
+    middle_name = Column(String(50), nullable=True, doc="Optional middle name")
+    last_name = Column(String(50), nullable=False, doc="Last name of the user")
+    username = Column(String(50), nullable=False, unique=True, index=True, doc="Unique username")
+    email = Column(String(100), nullable=True, unique=True, index=True, doc="Optional unique email address")
+    password_hash = Column(String(255), nullable=False, doc="Hashed password for authentication")
+    role = Column(Enum(UserRole), nullable=False, doc="Role of the user in the system")
+    sex = Column(Enum(Sex), nullable=False, doc="Sex/gender of the user")
+    birthdate = Column(Date, nullable=True, doc="Optional birthdate of the user")
+    phone_number = Column(String(20), nullable=True, doc="Optional phone number")
+    status = Column(Enum(UserStatus), nullable=False, default=UserStatus.active, doc="Account status")
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), doc="Account creation timestamp")
     updated_at = Column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
+        doc="Timestamp of last update"
     )
 
     # ---------------------------
     # Relationships
     # ---------------------------
 
-    # One-to-many: user -> refresh tokens
     refresh_tokens = relationship(
         "RefreshToken",
         back_populates="user",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        doc="One-to-many relationship with refresh tokens"
     )
 
-    # One-to-one: dependent user -> dependent profile
     dependent_profile = relationship(
         "DependentProfile",
         back_populates="user",
         cascade="all, delete-orphan",
         uselist=False,
-        foreign_keys="[DependentProfile.user_id]"
+        foreign_keys="[DependentProfile.user_id]",
+        doc="One-to-one relationship with dependent profile (for dependent users)"
     )
 
-    # One-to-many: caregiver -> dependent profiles
     dependents = relationship(
         "DependentProfile",
-        back_populates="caregiver",
-        foreign_keys="[DependentProfile.created_by]"
+        back_populates="family_member",
+        foreign_keys="[DependentProfile.created_by]",
+        doc="One-to-many relationship to dependent profiles created by caregiver users"
+    )
+
+    created_care_spaces = relationship(
+        "CareSpace",
+        back_populates="creator",
+        doc="One-to-many relationship to care spaces created by this user"
+    )
+
+    care_space_memberships = relationship(
+        "CareSpaceMember",
+        back_populates="user",
+        doc="One-to-many relationship to care space memberships (as caregiver/member)"
     )
