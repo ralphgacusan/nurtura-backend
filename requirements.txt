@@ -1,60 +1,14 @@
-"""
-requirements.txt
-
-This file lists all Python dependencies required for the FastAPI application.
-It includes dependencies for:
-
-- Core API functionality
-- Database access and migrations
-- Authentication and security
-- Configuration and settings management
-- Scheduling and background jobs
-- Real-time communication
-- File uploads and form handling
-
-Each dependency is commented to indicate its purpose.
-"""
-# ---------------------------
-# Core API
-# ---------------------------
-fastapi                 # The main web framework
-uvicorn[standard]       # ASGI server for running FastAPI apps
-
-# ---------------------------
-# Database
-# ---------------------------
-sqlalchemy              # ORM for interacting with SQL databases
-asyncpg                 # Async PostgreSQL driver (for SQLAlchemy async)
-psycopg2-binary         # PostgreSQL driver (synchronous, optional if using asyncpg)
-alembic                 # Database migrations tool
-
-# ---------------------------
-# Authentication & Security
-# ---------------------------
-python-jose[cryptography]   # JWT token creation and verification
-passlib[bcrypt]             # Password hashing using bcrypt
-# pwdlib[argon2]            # Optional: Argon2 password hashing (alternative to bcrypt)
-# pyjwt                      # Optional: JWT library (redundant if using python-jose)
-
-# ---------------------------
-# Configuration & Settings
-# ---------------------------
-pydantic                   # Data validation and settings management
-# pydantic[email]           # Not needed in Pydantic 2.x, EmailStr is included
-pydantic-settings           # Pydantic 2.x settings management for .env configs
-python-dotenv               # Load environment variables from .env files
-
-# ---------------------------
-# Scheduling & Background Jobs
-# ---------------------------
-apscheduler                # Schedule tasks/jobs, e.g., reminders or periodic tasks
-
-# ---------------------------
-# Real-time & Notifications
-# ---------------------------
-websockets                 # WebSocket support for real-time communication
-
-# ---------------------------
-# File uploads / Forms
-# ---------------------------
-python-multipart           # Required for form-data and file uploads in FastAPI
+fastapi==0.111.0
+uvicorn[standard]==0.23.2
+sqlalchemy==2.1.1
+asyncpg==0.27.1
+psycopg2-binary==2.9.7
+alembic==1.12.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.8.2
+pydantic==2.5.1
+pydantic-settings==2.2.0
+python-dotenv==1.0.0
+apscheduler==3.11.1
+websockets==11.1.0
+python-multipart==0.0.6
