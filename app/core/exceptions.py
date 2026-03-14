@@ -148,3 +148,50 @@ too_many_active_join_codes_exception = HTTPException(
     status_code=status.HTTP_400_BAD_REQUEST,
     detail="Too many active join codes for this care space"
 )
+
+# ---------------------------
+# Task Errors
+# ---------------------------
+
+# Raised when a task cannot be created for some reason
+task_creation_failed_exception = HTTPException(
+    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    detail="Failed to create task"
+)
+
+# Raised when creating an assignment fails
+task_assignment_creation_failed_exception = HTTPException(
+    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    detail="Failed to create task assignment"
+)
+
+# Raised when creating a schedule fails
+task_schedule_creation_failed_exception = HTTPException(
+    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    detail="Failed to create task schedule"
+)
+
+# Raised when creating a completion fails
+task_completion_creation_failed_exception = HTTPException(
+    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+    detail="Failed to create task completion"
+)
+
+
+# Task update failed
+task_update_failed_exception = HTTPException(
+    status_code=500,
+    detail="Failed to update task status"
+)
+
+# Task completion not found
+task_completion_not_found_exception = HTTPException(
+    status_code=404,
+    detail="Task completion not found"
+)
+
+# Task assignment not found
+task_assignment_not_found_exception = HTTPException(
+    status_code=404,
+    detail="Task assignment not found"
+)

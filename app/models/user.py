@@ -91,6 +91,7 @@ class User(Base):
         dependents (list[DependentProfile]): Dependent profiles created by caregiver users.
         created_care_spaces (list[CareSpace]): Care spaces created by this user.
         care_space_memberships (list[CareSpaceMember]): Memberships in care spaces.
+        tasks (list[Task]): Task created.
     """
 
     __tablename__ = "users"
@@ -155,4 +156,16 @@ class User(Base):
         "CareSpaceMember",
         back_populates="user",
         doc="One-to-many relationship to care space memberships (as caregiver/member)"
+    )
+
+    created_tasks = relationship(
+        "Task",
+        back_populates="creator",
+        doc="One-to-many relationship to tasks created by this user"
+    )
+
+    task_assignments = relationship(
+        "TaskAssignment",
+        back_populates="user",
+        doc="One-to-many relationship to assigned tasks"
     )

@@ -19,6 +19,7 @@ Relationships:
 - creator: Many-to-one relationship with the User who created the space
 - members: One-to-many relationship with CareSpaceMember
 - join_codes: One-to-many relationship with CareSpaceJoinCode
+- 
 """
 
 # ---------------------------
@@ -123,4 +124,11 @@ class CareSpace(Base):
         back_populates="care_space",
         cascade="all, delete-orphan",
         doc="Join codes generated for this care space"
+    )
+
+    tasks = relationship(
+        "Task",
+        back_populates="care_space",
+        cascade="all, delete-orphan",
+        doc="One-to-many relationship to tasks"
     )

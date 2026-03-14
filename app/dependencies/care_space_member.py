@@ -32,6 +32,11 @@ from app.repositories.care_space_member import CareSpaceMemberRepository
 from app.repositories.care_space import CareSpaceRepository
 from app.repositories.user import UserRepository
 from app.services.care_space_member import CareSpaceMemberService
+from app.models.care_space_member import CareSpaceMember
+from app.models.user import User
+from app.core.exceptions import care_space_dependent_not_found_exception
+from app.core.permissions import ensure_member_and_can_manage_tasks
+from app.dependencies.auth import get_current_user
 
 # ---------------------------
 # Repository Dependencies
@@ -104,3 +109,31 @@ async def get_care_space_member_service(
         CareSpaceMemberService: Service that handles business logic for care space members.
     """
     return CareSpaceMemberService(member_repo, care_space_repo, user_repo)
+
+
+# ---------------------------
+# Member Dependency for Current User & Care Space
+# ---------------------------
+
+async def get_current_member(
+    care_space_id: int,
+    current_user: Annotated[User, Depends(get_current_user)],
+    member_repo: Annotated[CareSpaceMemberRepository, Depends(get_care_space_member_repo)]
+) -> CareSpaceMember:
+    """
+    Retrieve the CareSpaceMember for the current user in a specific care space.
+    
+    Raises:
+        HTTPException 403 if the user is not allowed to manage tasks.
+    """
+    member = await member_repo.get_by_user_and_space(
+        user_id=current_user.user_id,
+        care_space_id=care_space_id
+    )
+    if not member:
+        raise care_space_dependent_not_found_exception
+
+    # Check if the member has permission to manage tasks
+    ensure_member_and_can_manage_tasks(member)
+
+    return member

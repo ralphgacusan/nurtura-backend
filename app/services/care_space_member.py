@@ -183,3 +183,29 @@ class CareSpaceMemberService:
         # Fetch members
         members = await self.member_repo.list_members(care_space_id, eager_load_user=True)
         return [CareSpaceMemberRead.model_validate(member) for member in members]
+    
+    # ---------------------------
+    # ENSURE USER IS MEMBER (PUBLIC)
+    # ---------------------------
+    async def ensure_user_is_member(self, care_space_id: int, user_id: int):
+        """
+        Ensure that a user is a member of a care space.
+
+        Used by other services (TaskService, ScheduleService, etc.)
+
+        Args:
+            care_space_id (int)
+            user_id (int)
+
+        Raises:
+            forbidden_exception if not member
+        """
+
+        member = await self.member_repo.get_member(
+            care_space_id,
+            user_id
+        )
+
+        ensure_member(member)
+
+        return member
