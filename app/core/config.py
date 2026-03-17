@@ -12,6 +12,7 @@ Features:
 """
 
 from pydantic_settings import BaseSettings  # BaseSettings provides environment variable parsing and type validation
+import os
 
 class Settings(BaseSettings):
     """
@@ -70,23 +71,25 @@ class Settings(BaseSettings):
     # -------------------------
     # Computed Properties
     # -------------------------
+
     @property
     def DATABASE_URL(self) -> str:
         """
-        Construct the SQLAlchemy database URL from environment variables.
+        Returns the database URL for SQLAlchemy.
 
-        Returns:
-            str: Database connection string in the format:
-                 <DB_ENGINE>://<DB_USER>:<DB_PASSWORD>@<DB_HOST>:<DB_PORT>/<DB_NAME>
-
-        Example:
-            postgresql+asyncpg://user:password@localhost:5432/mydb
+        Priority:
+        1. Use full DATABASE_URL environment variable (Render / production)
+        2. Otherwise, construct from local DB_* variables (development)
         """
-        return (
-            f"{self.DB_ENGINE}://{self.DB_USER}:{self.DB_PASSWORD}"
-            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-        )
+        # Try reading DATABASE_URL from environment (used in Render)
+        env_url = os.getenv("DATABASE_URL")
+        if env_url:
+            return env_url
 
+        # Fallback for local development using DB_* variables
+        return f"{self.DB_ENGINE}://{self.DB_USER}:{self.DB_PASSWORD}" \
+            f"@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
+    
     class Config:
         """
         Pydantic configuration class for Settings.
