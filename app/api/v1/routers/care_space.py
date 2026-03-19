@@ -27,7 +27,8 @@ from app.services import CareSpaceService, CareSpaceJoinCodeService
 from app.dependencies.care_space import get_care_space_service, get_care_space_join_code_service
 from app.dependencies.auth import get_current_active_user, get_current_user  # Auth dependencies
 from app.models.user import User  # User model for type hinting current_user
-
+from app.schemas.care_space_join_code import CareSpaceJoinRequest
+from app.schemas.care_space_member import CareSpaceMemberRead
 # ---------------------------
 # Router Configuration
 # ---------------------------
@@ -90,10 +91,39 @@ async def generate_join_code(
     """
     join_code_data = CareSpaceJoinCodeCreate(
         care_space_id=data.care_space_id,
-        default_role="viewer"
+        role=data.role
     )
     return await join_code_service.generate_join_code(
         data=join_code_data, current_user=current_user
+    )
+
+# ---------------------------
+# Join Care Space via Code
+# ---------------------------
+@router.post(
+    "/join",
+    response_model=CareSpaceMemberRead,
+    description="Join a care space using a join code."
+)
+async def join_care_space_via_code(
+    data: CareSpaceJoinRequest,  # contains the join code
+    current_user: Annotated[User, Depends(get_current_user)],
+    join_code_service: Annotated[CareSpaceJoinCodeService, Depends(get_care_space_join_code_service)],
+):
+    """
+    Join a care space using a valid join code.
+
+    Parameters:s
+    - data: CareSpaceJoinRequest containing the join code
+    - current_user: Authenticated user
+    - join_code_service: Service handling join logic
+
+    Returns:
+    - CareSpaceMemberRead: Membership info after joining
+    """
+    return await join_code_service.join_via_code(
+        code=data.code,
+        current_user=current_user
     )
 
 # ---------------------------

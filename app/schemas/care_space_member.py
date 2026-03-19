@@ -62,6 +62,10 @@ class CareSpaceMemberCreate(CareSpaceMemberBase):
     """
     user_id: int
 
+class CareSpaceMemberBulkCreate(BaseModel):
+    care_space_id: int
+    user_ids: list[int]
+
 
 # ---------------------------
 # READ SCHEMA

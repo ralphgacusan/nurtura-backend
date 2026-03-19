@@ -26,7 +26,7 @@ from app.schemas.care_space import CareSpaceCreate, CareSpaceUpdate, CareSpaceRe
 from app.schemas.care_space_member import CareSpaceMemberCreate
 from app.models.user import User
 from app.core.permissions import ensure_family_member, ensure_member, ensure_family_owner
-from app.core.exceptions import care_space_not_found_exception
+from app.core.exceptions import care_space_not_found_exception, user_not_found_exception
 from app.core.config import settings
 
 # ---------------------------
@@ -75,33 +75,53 @@ class CareSpaceService:
     # ---------------------------
     # CREATE CARESPACE
     # ---------------------------
-    async def create_care_space(self, data: CareSpaceCreate, current_user: User) -> CareSpaceRead:
-        """
-        Create a new care space and assign the creator as owner.
+    async def create_care_space(
+        self,
+        data: CareSpaceCreate,
+        current_user: User
+    ) -> CareSpaceRead:
 
-        Args:
-            data (CareSpaceCreate): Care space creation info
-            current_user (User): Current authenticated user
-
-        Returns:
-            CareSpaceRead: Created care space with members
-        """
         ensure_family_member(current_user)
 
-        care_space = await self.care_space_repo.create_care_space(care_space=data, user_id=current_user.user_id)
+        # 1. Create care space
+        care_space = await self.care_space_repo.create_care_space(
+            care_space=data,
+            user_id=current_user.user_id
+        )
         await self.care_space_repo.db.commit()
 
-        # Add creator as owner
-        member_data = CareSpaceMemberCreate(
+        # 2. Add creator as owner
+        owner_member = CareSpaceMemberCreate(
             care_space_id=care_space.care_space_id,
             user_id=current_user.user_id,
             role_in_space="owner"
         )
-        await self.member_repo.add_member(member_data)
+        await self.member_repo.add_member(owner_member)
+
+        # 3. OPTIONAL: Add dependents (bulk)
+        if data.dependent_user_ids:
+            for user_id in data.dependent_user_ids:
+
+                # Optional: validate user exists
+                user = await self.user_repo.get_by_id(user_id)
+                if not user:
+                    raise user_not_found_exception
+
+                dependent_member = CareSpaceMemberCreate(
+                    care_space_id=care_space.care_space_id,
+                    user_id=user_id,
+                    role_in_space="viewer"
+                )
+                await self.member_repo.add_member(dependent_member)
+
         await self.member_repo.db.commit()
 
-        # Reload with eager loading for members
-        care_space = await self.care_space_repo.get_by_id(care_space.care_space_id, eager_load=True)
+        # 4. Reload with members
+        care_space = await self.care_space_repo.get_by_id(
+            care_space.care_space_id,
+            eager_load=True
+        )
+
         return CareSpaceRead.model_validate(care_space)
 
     # ---------------------------

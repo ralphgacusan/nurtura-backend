@@ -21,7 +21,7 @@ class CareSpaceJoinCodeCreate(BaseModel):
         role (str | None): Role assigned to users who join via this code. Defaults to 'viewer'.
     """
     care_space_id: int
-    role: str | None = "viewer"
+    role: str
 
 
 # ---------------------------
@@ -45,3 +45,7 @@ class CareSpaceJoinCodeRead(BaseModel):
     model_config = {
         "from_attributes": True  # Enables ORM mode for SQLAlchemy model
     }
+
+
+class CareSpaceJoinRequest(BaseModel):
+    code: str

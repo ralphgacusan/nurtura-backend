@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends  # APIRouter for route grouping, Depends 
 # ---------------------------
 # Local Application Imports
 # ---------------------------
-from app.schemas.care_space_member import CareSpaceMemberCreate, CareSpaceMemberUpdate, CareSpaceMemberRead
+from app.schemas.care_space_member import CareSpaceMemberBulkCreate, CareSpaceMemberUpdate, CareSpaceMemberRead
 from app.services.care_space_member import CareSpaceMemberService
 from app.dependencies.care_space_member import get_care_space_member_service
 from app.dependencies.auth import get_current_active_user  # Dependency to get the currently authenticated user
@@ -40,32 +40,20 @@ router = APIRouter(
 # Add Member
 # ---------------------------
 @router.post(
-    "/",
-    response_model=CareSpaceMemberRead,
-    description="Add a member to a care space (owner only)."
+    "/bulk",
+    response_model=list[CareSpaceMemberRead],
+    description="Add multiple members to a care space (owner only)."
 )
-async def add_member(
-    data: CareSpaceMemberCreate,  # Schema containing user_id and role
-    current_user: Annotated[User, Depends(get_current_active_user)],  # Ensure the requester is authenticated
-    service: Annotated[CareSpaceMemberService, Depends(get_care_space_member_service)],  # Service layer
+async def add_members(
+    data: CareSpaceMemberBulkCreate,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    service: Annotated[CareSpaceMemberService, Depends(get_care_space_member_service)],
 ):
-    """
-    Add a user as a member to a care space.
-    Only the care space owner can perform this action.
-
-    Parameters:
-    - data: CareSpaceMemberCreate object with member details
-    - current_user: The authenticated user making the request
-    - service: CareSpaceMemberService instance
-
-    Returns:
-    - CareSpaceMemberRead: Details of the newly added member
-    """
-    return await service.add_member(data, current_user)
+    return await service.add_members(data, current_user)
 
 # ---------------------------
 # Update Member
-# ---------------------------
+# ---------------------------s
 @router.put(
     "/{member_id}",
     response_model=CareSpaceMemberRead,

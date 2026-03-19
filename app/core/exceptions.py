@@ -149,6 +149,30 @@ too_many_active_join_codes_exception = HTTPException(
     detail="Too many active join codes for this care space"
 )
 
+# Raised when a provided join code is invalid (not found in DB)
+invalid_join_code_exception = HTTPException(
+    status_code=status.HTTP_404_NOT_FOUND,
+    detail="Invalid join code"
+)
+
+# Raised when a join code has expired
+join_code_expired_exception = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail="Join code has expired"
+)
+
+# Raised when a join code has already been used
+join_code_already_used_exception = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail="Join code has already been used"
+)
+
+# Raised when a user is already a member of the care space
+already_member_exception = HTTPException(
+    status_code=status.HTTP_400_BAD_REQUEST,
+    detail="User is already a member of this care space"
+)
+
 # ---------------------------
 # Task Errors
 # ---------------------------

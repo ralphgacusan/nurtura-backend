@@ -41,7 +41,8 @@ class CareSpaceCreate(CareSpaceBase):
 
     Inherits all fields from CareSpaceBase.
     """
-    pass
+    dependent_user_ids: list[int] | None = None
+
 
 
 # ---------------------------

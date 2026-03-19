@@ -25,13 +25,18 @@ from app.models.user import User
 from app.repositories.care_space_join_code import CareSpaceJoinCodeRepository
 from app.repositories.care_space_member import CareSpaceMemberRepository
 from app.schemas.care_space_join_code import CareSpaceJoinCodeCreate, CareSpaceJoinCodeRead
+from app.schemas.care_space_member import CareSpaceMemberCreate, CareSpaceMemberRead
 from app.core.config import settings
 from app.core.security import hash_join_code
 from app.core.permissions import ensure_editor_or_owner
 from app.core.exceptions import (
     care_space_member_not_found_exception,
     too_many_active_join_codes_exception,
-    forbidden_exception
+    forbidden_exception,
+    invalid_join_code_exception,
+    join_code_expired_exception,
+    join_code_already_used_exception,
+    already_member_exception
 )
 
 # ---------------------------
@@ -141,3 +146,62 @@ class CareSpaceJoinCodeService:
             role=stored_code.role,
             expires_at=stored_code.expires_at
         )
+    
+
+    async def join_via_code(self, code: str, current_user: User) -> CareSpaceMemberRead:
+        """
+        Join a care space using a join code.
+
+        Steps:
+        1. Hash incoming code
+        2. Retrieve stored join code
+        3. Validate (exists, not expired, not used)
+        4. Ensure user is not already a member
+        5. Create membership
+        6. Mark code as used
+        """
+
+        # Hash incoming code
+        hashed_code = hash_join_code(code)
+
+        # Find code in DB
+        join_code = await self.join_code_repo.get_by_code(hashed_code)
+        if not join_code:
+            raise invalid_join_code_exception
+
+        # Validate expiration
+        if join_code.expires_at < datetime.now(timezone.utc):
+            raise join_code_expired_exception
+
+        # Validate usage
+        if join_code.is_used:
+            raise join_code_already_used_exception
+
+        # Check if already a member
+        existing_member = await self.member_repo.get_member(
+            join_code.care_space_id,
+            current_user.user_id
+        )
+        if existing_member:
+            raise already_member_exception
+
+        # Create membership
+        member_data = CareSpaceMemberCreate(
+            care_space_id=join_code.care_space_id,
+            user_id=current_user.user_id,
+            role_in_space=join_code.role
+        )
+
+        new_member = await self.member_repo.add_member(member_data)
+
+        # Mark code as used (optional but recommended)
+        join_code.is_used = True
+        await self.join_code_repo.db.commit()
+
+        # Reload with user
+        new_member = await self.member_repo.get_by_id(
+            new_member.member_id,
+            eager_load_user=True
+        )
+
+        return CareSpaceMemberRead.model_validate(new_member)

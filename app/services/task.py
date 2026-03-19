@@ -628,8 +628,8 @@ class TaskService:
         Dynamically update:
         - Task completion status (completed, missed, pending)
         - Assignment acknowledgment (seen)
-        
-        Uses predefined exceptions from core/exceptions.py
+
+        Raises HTTPExceptions defined in core/exceptions.py if invalid.
         """
         result = {}
 
@@ -640,7 +640,7 @@ class TaskService:
             if data.acknowledge and data.assignment_id:
                 assignment = await self.assignment_repo.get_by_id(data.assignment_id)
                 if not assignment:
-                    raise task_assignment_not_found_exception
+                    raise task_assignment_not_found_exception  # already HTTPException instance
 
                 assignment.acknowledged_at = datetime.now(timezone.utc)
                 self.assignment_repo.db.add(assignment)
@@ -657,10 +657,14 @@ class TaskService:
                 from app.schemas.task_completion import TaskCompletionUpdate
                 updates = TaskCompletionUpdate(
                     status=data.status,
-                    completed_at=datetime.now(timezone.utc) if data.status == CompletionStatus.completed else None
+                    completed_at=datetime.now(timezone.utc)
+                    if data.status == CompletionStatus.completed
+                    else None
                 )
 
-                updated_completion = await self.completion_repo.update_completion(data.completion_id, updates)
+                updated_completion = await self.completion_repo.update_completion(
+                    data.completion_id, updates
+                )
                 if not updated_completion:
                     raise task_completion_not_found_exception
 
@@ -670,19 +674,19 @@ class TaskService:
                     "completed_at": updated_completion.completed_at
                 }
 
+            # ---------------------------
+            # 3️⃣ Nothing to update
+            # ---------------------------
             if not result:
-                # Nothing to update
                 raise invalid_input_exception
 
-        except (
-            task_assignment_not_found_exception,
-            task_completion_not_found_exception,
-            invalid_input_exception
-        ):
-            # re-raise known exceptions
-            raise
         except Exception as e:
-            # fallback for unexpected errors
-            raise task_update_failed_exception
+            # Only wrap unexpected exceptions
+            from app.core.exceptions import task_update_failed_exception
+            # If the exception is a known HTTPException, re-raise it
+            from fastapi import HTTPException
+            if isinstance(e, HTTPException):
+                raise
+            raise task_update_failed_exception from e
 
         return result

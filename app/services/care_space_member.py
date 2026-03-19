@@ -20,7 +20,7 @@ from datetime import datetime
 from app.repositories.care_space_member import CareSpaceMemberRepository
 from app.repositories.care_space import CareSpaceRepository
 from app.repositories.user import UserRepository
-from app.schemas.care_space_member import CareSpaceMemberCreate, CareSpaceMemberUpdate, CareSpaceMemberRead
+from app.schemas.care_space_member import CareSpaceMemberCreate, CareSpaceMemberUpdate, CareSpaceMemberRead, CareSpaceMemberBulkCreate
 from app.models.user import User
 from app.core.permissions import ensure_member, ensure_family_owner
 from app.core.exceptions import care_space_not_found_exception, user_not_found_exception
@@ -71,45 +71,59 @@ class CareSpaceMemberService:
     # ---------------------------
     # ADD MEMBER
     # ---------------------------
-    async def add_member(self, data: CareSpaceMemberCreate, current_user: User) -> CareSpaceMemberRead:
-        """
-        Add a new member to a care space.
+    async def add_members(
+        self,
+        data: CareSpaceMemberBulkCreate,
+        current_user: User
+    ) -> list[CareSpaceMemberRead]:
 
-        Only family owners can add members.
-
-        Args:
-            data (CareSpaceMemberCreate): Data of the member to add
-            current_user (User): Authenticated user performing the action
-
-        Returns:
-            CareSpaceMemberRead: Created membership info
-        """
-        # Ensure current user is a member and has owner privileges
+        # Validate owner
         member = await self._get_member(data.care_space_id, current_user)
         ensure_family_owner(member, current_user)
 
-        # Validate care space exists
+        # Validate care space
         care_space = await self.care_space_repo.get_by_id(data.care_space_id)
         if not care_space:
             raise care_space_not_found_exception
-        
-        # Validate user exists
-        user_to_add = await self.user_repo.get_by_id(data.user_id)
-        if not user_to_add:
-            raise user_not_found_exception 
 
-        # Prepare member data and add to DB
-        member_data = CareSpaceMemberCreate(
-            care_space_id=care_space.care_space_id,
-            user_id=data.user_id,
-            role_in_space=data.role_in_space
-        )
-        new_member = await self.member_repo.add_member(member_data)
+        created_members = []
+
+        for user_id in data.user_ids:
+
+            # Validate user
+            user = await self.user_repo.get_by_id(user_id)
+            if not user:
+                raise user_not_found_exception
+
+            # Skip if already member (optional but recommended)
+            existing = await self.member_repo.get_member(
+                data.care_space_id,
+                user_id
+            )
+            if existing:
+                continue  # or raise exception
+
+            member_data = CareSpaceMemberCreate(
+                care_space_id=data.care_space_id,
+                user_id=user_id,
+                role_in_space="viewer"
+            )
+
+            new_member = await self.member_repo.add_member(member_data)
+            created_members.append(new_member)
+
         await self.member_repo.db.commit()
 
-        # Reload member with user info
-        new_member = await self.member_repo.get_by_id(new_member.member_id, eager_load_user=True)
-        return CareSpaceMemberRead.model_validate(new_member)
+        # Reload with user info
+        results = []
+        for m in created_members:
+            full = await self.member_repo.get_by_id(
+                m.member_id,
+                eager_load_user=True
+            )
+            results.append(CareSpaceMemberRead.model_validate(full))
+
+        return results
 
     # ---------------------------
     # UPDATE MEMBER
@@ -209,3 +223,10 @@ class CareSpaceMemberService:
         ensure_member(member)
 
         return member
+    
+    async def count_user_care_spaces(self, user_id: int) -> int:
+        """
+        Count the number of care spaces a user belongs to.
+        """
+        return await self.member_repo.count_by_user(user_id)
+    

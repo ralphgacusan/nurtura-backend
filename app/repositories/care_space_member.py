@@ -5,9 +5,8 @@ Repository for managing CareSpaceMember ORM objects.
 Handles CRUD operations and queries for care space memberships.
 """
 
-from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.models.care_space_member import CareSpaceMember
@@ -49,7 +48,7 @@ class CareSpaceMemberRepository:
         self, 
         member_id: int, 
         eager_load_user: bool = False
-    ) -> Optional[CareSpaceMember]:
+    ) -> CareSpaceMember | None:
         """
         Retrieve a care space member by membership ID.
         """
@@ -66,7 +65,7 @@ class CareSpaceMemberRepository:
         self, 
         care_space_id: int, 
         eager_load_user: bool = False
-    ) -> List[CareSpaceMember]:
+    ) -> list[CareSpaceMember]:
         """
         List all members of a specific care space.
         """
@@ -84,7 +83,7 @@ class CareSpaceMemberRepository:
         user_id: int, 
         care_space_id: int, 
         eager_load_user: bool = False
-    ) -> Optional[CareSpaceMember]:
+    ) -> CareSpaceMember | None:
         """
         Retrieve a member record by user and care space.
         """
@@ -107,7 +106,7 @@ class CareSpaceMemberRepository:
         self, 
         member_id: int, 
         updates: CareSpaceMemberUpdate
-    ) -> Optional[CareSpaceMember]:
+    ) -> CareSpaceMember | None:
         """
         Update a member record.
         """
@@ -146,7 +145,7 @@ class CareSpaceMemberRepository:
         member = await self.get_by_user_and_space(user_id, care_space_id)
         return member is not None  # True if exists
 
-    async def get_member(self, care_space_id: int, user_id: int) -> Optional[CareSpaceMember]:
+    async def get_member(self, care_space_id: int, user_id: int) -> CareSpaceMember | None:
         """
         Retrieve a member by care space and user.
         """
@@ -156,15 +155,20 @@ class CareSpaceMemberRepository:
         self, 
         care_space_id: int, 
         eager_load_user: bool = False
-    ) -> List[CareSpaceMember]:
+    ) -> list[CareSpaceMember]:
         """
         List all members of a care space (alias of list_by_care_space).
         """
         return await self.list_by_care_space(care_space_id, eager_load_user=eager_load_user)
 
-    async def get_member_role(self, care_space_id: int, user_id: int) -> Optional[str]:
+    async def get_member_role(self, care_space_id: int, user_id: int) -> str | None:
         """
         Retrieve the role of a member in a care space.
         """
         member = await self.get_by_user_and_space(user_id, care_space_id)
         return member.role_in_space if member else None
+    
+    async def count_by_user(self, user_id: int) -> int:
+        query = select(func.count(CareSpaceMember.care_space_id)).where(CareSpaceMember.user_id == user_id)
+        result = await self.db.execute(query)
+        return result.scalar() or 0
