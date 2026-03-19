@@ -26,7 +26,7 @@ from app.dependencies.auth import get_current_user
 
 from app.core.permissions import ensure_member_and_can_manage_tasks
 from app.dependencies.care_space_member import get_current_member
-from app.schemas.task import TaskUpdateRequest
+from app.schemas.task import TaskUpdateRequest, TaskDateFilter, TaskPriority, TaskStatus
 from app.schemas.task_completion import TaskStatusUpdateRequest
 
 # ---------------------------
@@ -93,6 +93,7 @@ async def list_tasks_by_care_space(
         eager_load=True
     )
 
+
 # ---------------------------
 # GET SINGLE TASK BY ID
 # ---------------------------
@@ -138,14 +139,41 @@ async def list_tasks_by_member(
     description="Get all tasks assigned to the currently logged-in user."
 )
 async def list_my_tasks(
-    current_user: Annotated[User, Depends(get_current_user)],  # Authenticated user object
+    current_user: Annotated[User, Depends(get_current_user)],
+    date_filter: TaskDateFilter = TaskDateFilter.all,
+    priority: TaskPriority | None = None,
+    status: TaskStatus | None = None,
     task_service: TaskService = Depends(get_task_service)
 ):
-    """
-    Retrieve all tasks assigned to the current authenticated user.
-    No user ID or care_space_id input needed — dynamically fetched from token.
-    """
-    return await task_service.list_tasks_for_current_user(current_user=current_user)
+    return await task_service.list_tasks_for_current_user(
+        current_user=current_user,
+        date_filter=date_filter,
+        priority=priority,
+        status=status
+    )
+
+# ---------------------------
+# List Tasks by Creator
+# ---------------------------
+@router.get(
+    "/created/me",
+    response_model=List[TaskReadExtended],
+    summary="List Tasks Created by Me",
+    description="Get all tasks created by the currently logged-in user."
+)
+async def list_tasks_created_by_me(
+    current_user: Annotated[User, Depends(get_current_user)],
+    date_filter: TaskDateFilter = TaskDateFilter.all,
+    priority: TaskPriority | None = None,
+    status: TaskStatus | None = None,
+    task_service: TaskService = Depends(get_task_service)
+):
+    return await task_service.list_tasks_created_by_current_user(
+        current_user=current_user,
+        date_filter=date_filter,
+        priority=priority,
+        status=status
+    )
 
 # ---------------------------
 # Update Task Endpoint

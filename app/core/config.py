@@ -69,6 +69,11 @@ class Settings(BaseSettings):
     CARE_SPACE_CODE_LENGTH: int        # Length of the join code
 
     # -------------------------
+    # GEMINI AI API KEY
+    # -------------------------
+    GEMINI_API_KEY: str
+
+    # -------------------------
     # Computed Properties
     # -------------------------
 

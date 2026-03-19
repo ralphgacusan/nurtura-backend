@@ -8,6 +8,8 @@ Responsibilities:
 - Manage related assignments, schedules, and completions
 """
 
+
+
 # ---------------------------
 # Local App Imports
 # ---------------------------
@@ -15,14 +17,19 @@ from app.repositories.task import TaskRepository
 from app.repositories.task_assignment import TaskAssignmentRepository
 from app.repositories.schedule import ScheduleRepository
 from app.repositories.task_completion import TaskCompletionRepository
-from app.schemas.task import TaskCreate, TaskUpdate, TaskRead, TaskReadExtended, TaskAssignmentRead, TaskScheduleRead
+from app.schemas.task import (
+    TaskCreate, TaskUpdate, TaskRead, 
+    TaskReadExtended, TaskAssignmentRead, 
+    TaskScheduleRead, TaskDateFilter, TaskPriority, 
+    TaskStatus
+)
 from app.schemas.task_assignment import TaskAssignmentCreate
 from app.schemas.schedule import ScheduleCreate
 from app.schemas.task_completion import TaskCompletionCreate
 from app.models.user import User
 from app.models.task import Task
 from app.models.care_space_member import CareSpaceMember
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from app.models.care_space_member import CareSpaceMember
 from app.core.exceptions import (
@@ -35,7 +42,7 @@ from app.core.exceptions import (
     invalid_input_exception,
     task_update_failed_exception
 )
-from app.core.permissions import ensure_member_and_can_manage_tasks
+from app.core.permissions import ensure_member_and_can_manage_tasks, ensure_member
 from app.services.care_space_member import CareSpaceMemberService
 from app.schemas.task_completion import CompletionStatus, TaskStatusUpdateRequest, TaskCompletionRead
 
@@ -62,6 +69,70 @@ class TaskService:
         self.schedule_repo = schedule_repo
         self.completion_repo = completion_repo
         self.care_space_member_service = care_space_member_service
+
+    
+    def _apply_filters(
+        self,
+        tasks,
+        date_filter: TaskDateFilter,
+        priority: TaskPriority | None,
+        status: TaskStatus | None
+    ):
+        now = datetime.now(timezone.utc)
+
+        # ---------------------------
+        # DATE RANGE
+        # ---------------------------
+        if date_filter == TaskDateFilter.today:
+            start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = start + timedelta(days=1)
+
+        elif date_filter == TaskDateFilter.week:
+            start = now - timedelta(days=now.weekday())
+            start = start.replace(hour=0, minute=0, second=0, microsecond=0)
+            end = start + timedelta(days=7)
+
+        elif date_filter == TaskDateFilter.month:
+            start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            end = (start.replace(month=start.month % 12 + 1, year=start.year + (start.month // 12)))
+
+        else:
+            start = end = None
+
+        filtered = []
+
+        for task in tasks:
+
+            # ---------------------------
+            # PRIORITY FILTER
+            # ---------------------------
+            if priority and task.priority != priority:
+                continue
+
+            # ---------------------------
+            # DATE FILTER (via schedules)
+            # ---------------------------
+            if start and end:
+                schedules = getattr(task, "schedules", [])
+
+                if not any(
+                    sched.start_time and start <= sched.start_time < end
+                    for sched in schedules
+                ):
+                    continue
+
+            # ---------------------------
+            # STATUS FILTER (via completions)
+            # ---------------------------
+            if status:
+                completions = getattr(task, "completions", [])
+
+                if not any(c.status == status for c in completions):
+                    continue
+
+            filtered.append(task)
+
+        return filtered
 
     # ---------------------------
     # CREATE TASK
@@ -187,7 +258,7 @@ class TaskService:
         member: CareSpaceMember = None
     ) -> TaskReadExtended:
         if member:
-            ensure_member_and_can_manage_tasks(member)
+            ensure_member(member)
 
         task = await self.task_repo.get_by_id(task_id, eager_load=True)
         if not task:
@@ -237,7 +308,10 @@ class TaskService:
     async def list_tasks_for_current_user(
         self,
         current_user: User,
-        eager_load: bool = True
+        eager_load: bool = True,
+        date_filter: TaskDateFilter = TaskDateFilter.all,
+        priority: TaskPriority | None = None,
+        status: TaskStatus | None = None
     ) -> list[TaskReadExtended]:
         member_id = current_user.user_id
         assignments = await self.assignment_repo.list_by_user(member_id, eager_load=eager_load)
@@ -257,7 +331,60 @@ class TaskService:
                 task_read = await self._populate_completions(task_read)
                 tasks.append(task_read)
 
+        tasks = self._apply_filters(tasks, date_filter, priority, status)
+
         return tasks
+    
+
+   
+    
+    # ---------------------------
+    # LIST TASKS CREATED BY CURRENT USER
+    # ---------------------------
+    async def list_tasks_created_by_current_user(
+        self,
+        current_user: User,
+        eager_load: bool = True,
+        date_filter: TaskDateFilter = TaskDateFilter.all,
+        priority: TaskPriority | None = None,
+        status: TaskStatus | None = None
+    ) -> list[TaskReadExtended]:
+
+        member_id = current_user.user_id
+
+        tasks = await self.task_repo.list_task_by_creator(
+            member_id,
+            eager_load=eager_load
+        )
+
+        result = []
+
+        for task in tasks:
+            if task:
+                task_read = TaskReadExtended.model_validate(task)
+
+                task_read.assignments = [
+                    TaskAssignmentRead.model_validate(a)
+                    for a in getattr(task, "assignments", [])
+                ]
+
+                task_read.schedules = [
+                    TaskScheduleRead.model_validate(s)
+                    for s in getattr(task, "schedules", [])
+                ]
+
+                task_read = await self._populate_completions(task_read)
+
+                result.append(task_read)
+        
+        result = self._apply_filters(
+            result,
+            date_filter,
+            priority,
+            status
+        )
+
+        return result
     
    # ---------------------------
     # UPDATE TASK

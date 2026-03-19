@@ -169,3 +169,10 @@ class User(Base):
         back_populates="user",
         doc="One-to-many relationship to assigned tasks"
     )
+
+    chatbot_history = relationship(
+        "ChatbotHistory",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        doc="All AI interactions associated with this user"
+    )

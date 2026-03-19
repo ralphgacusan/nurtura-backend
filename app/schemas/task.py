@@ -15,6 +15,8 @@ Features:
 # Standard Library Imports
 # ---------------------------
 from datetime import datetime
+from enum import Enum
+
 
 # ---------------------------
 # Pydantic Imports
@@ -192,3 +194,22 @@ class TaskCompletionRead(BaseModel):
     updated_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TaskDateFilter(str, Enum):
+    all = "all"
+    today = "today"
+    week = "week"
+    month = "month"
+
+
+class TaskPriority(str, Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
+class TaskStatus(str, Enum):
+    pending = "pending"
+    completed = "completed"
+    missed = "missed"

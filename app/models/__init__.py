@@ -12,3 +12,5 @@ from .task import Task
 from .task_assignment import TaskAssignment
 from .task_completion import TaskCompletion
 from .schedule import Schedule
+
+from .chatbot_history import ChatbotHistory

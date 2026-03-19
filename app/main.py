@@ -24,6 +24,8 @@ from app.api.v1.routers.dependent_profile import router as dependent_profile_rou
 from app.api.v1.routers.care_space import router as care_space_router
 from app.api.v1.routers.care_space_member import router as care_space_member_router
 from app.api.v1.routers.task import router as task_router
+from app.api.v1.routers.chatbot import router as chatbot_router
+
 from app.core.config import settings
 
 # ---------------------------
@@ -76,6 +78,18 @@ app.include_router(
     prefix=f"{api_prefix}/tasks",
     tags=["tasks"]
 )
+
+
+# Chatbot
+app.include_router(
+    chatbot_router,
+    prefix=f"{api_prefix}/chatbot",
+    tags=["chatbot"]
+)
+
+
+
+
 
 # ---------------------------
 # Health Check Endpoint

@@ -123,3 +123,18 @@ class TaskRepository:
         await self.db.delete(task)
         await self.db.commit()
         return True
+    
+    async def list_task_by_creator(self, current_user_id: int, eager_load: bool = False) -> list[Task]:
+        """
+        List all tasks under a specific creator.
+        """
+        stmt = select(Task).where(Task.assigned_by == current_user_id)
+
+        if eager_load:
+            stmt = stmt.options(
+                selectinload(Task.assignments),
+                selectinload(Task.schedules)
+            )
+
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
