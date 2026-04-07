@@ -21,3 +21,6 @@ Thumbs.db
 
 # Alembic / Migrations 
 migrations/__pycache__/
+
+app/core/credentials/
+*.json
