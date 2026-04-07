@@ -24,7 +24,10 @@ from app.schemas.care_space_member import CareSpaceMemberCreate, CareSpaceMember
 from app.models.user import User
 from app.core.permissions import ensure_member, ensure_family_owner
 from app.core.exceptions import care_space_not_found_exception, user_not_found_exception
-
+from app.services.notification import NotificationService
+from app.schemas.notification import NotificationCreate
+from fastapi import HTTPException
+from app.core.exceptions import care_space_member_not_found_exception
 # ---------------------------
 # CareSpaceMember Service
 # ---------------------------
@@ -40,12 +43,16 @@ class CareSpaceMemberService:
         self,
         member_repo: CareSpaceMemberRepository,
         care_space_repo: CareSpaceRepository,
-        user_repo: UserRepository
+        user_repo: UserRepository,
+        notification_service: NotificationService
+
     ):
         """Initialize service with required repositories."""
         self.member_repo = member_repo
         self.care_space_repo = care_space_repo
         self.user_repo = user_repo
+        self.notification_service = notification_service
+
 
     # ---------------------------
     # PRIVATE METHOD: GET MEMBER
@@ -123,8 +130,16 @@ class CareSpaceMemberService:
             )
             results.append(CareSpaceMemberRead.model_validate(full))
 
-        return results
+            notification_data = NotificationCreate(
+                user_id=m.user_id,
+                title="Added to Care Space",
+                message=f"You have been added to the care space '{care_space.name}'.",
+                link=f"/care_spaces/{care_space.care_space_id}"
+            )
+            await self.notification_service.create_notification(notification_data)
 
+        return results
+    
     # ---------------------------
     # UPDATE MEMBER
     # ---------------------------
@@ -133,14 +148,6 @@ class CareSpaceMemberService:
         Update a member record (role or left_at).
 
         Only family owners can update member roles.
-
-        Args:
-            member_id (int): ID of the member to update
-            updates (CareSpaceMemberUpdate): Updated fields
-            current_user (User): Authenticated user performing the action
-
-        Returns:
-            CareSpaceMemberRead: Updated membership info
         """
         # Fetch member and validate permissions
         member = await self.member_repo.get_by_id(member_id, eager_load_user=True)
@@ -150,9 +157,30 @@ class CareSpaceMemberService:
         # Update member record
         updated_member = await self.member_repo.update_member(member_id, updates)
 
-        # Reload with eager loading to avoid missing related user data
-        updated_member = await self.member_repo.get_by_id(updated_member.member_id, eager_load_user=True)
+        # Reload with eager loading for user AND care_space to avoid lazy-load
+        updated_member = await self.member_repo.get_by_id(
+            updated_member.member_id,
+            eager_load_user=True,
+            eager_load_care_space=True  # <--- make sure care_space is loaded
+        )
+        
+        # Notify member about role change
+        await self.notification_service.create_notification(
+            NotificationCreate(
+                user_id=updated_member.user_id,
+                title="Care Space Role Updated",
+                message=f"Your role in care space '{updated_member.care_space.name}' has been updated to '{updated_member.role_in_space}'.",
+                link=f"/care_spaces/{updated_member.care_space_id}"
+            )
+        )
         return CareSpaceMemberRead.model_validate(updated_member)
+    
+    async def get_member_by_user_id(self, care_space_id: int, user_id: int):
+        member = await self.member_repo.get_member(care_space_id, user_id)
+        if not member:
+            raise care_space_member_not_found_exception
+        return member
+
 
     # ---------------------------
     # REMOVE MEMBER
@@ -170,13 +198,38 @@ class CareSpaceMemberService:
         Returns:
             dict: Confirmation message
         """
+        # Fetch member
         member = await self.member_repo.get_by_id(member_id, eager_load_user=True)
+        if not member:
+            raise HTTPException(status_code=404, detail="Care space member not found")
+
+        # Check current user's membership and permissions
         checked_member = await self._get_member(member.care_space_id, current_user)
         ensure_family_owner(checked_member, current_user)
 
+        # Remove member
         await self.member_repo.remove_member(member)
-        return {"detail": "Member removed successfully"}
 
+        # Explicitly fetch care space to avoid lazy-loading issues
+        care_space = await self.care_space_repo.get_by_id(member.care_space_id)
+        if not care_space:
+            # Fallback in case care space no longer exists
+            care_space_name = "Unknown Care Space"
+            care_space_id = member.care_space_id
+        else:
+            care_space_name = care_space.name
+            care_space_id = care_space.care_space_id
+
+        notification_data = NotificationCreate(
+            user_id=member.user_id,
+            title="Removed from Care Space",
+            message=f"You have been removed from care space '{care_space_name}'.",
+            link=f"/care_spaces/{care_space_id}"
+        )
+        await self.notification_service.create_notification(notification_data)
+
+        return {"detail": "Member removed successfully"}
+    
     # ---------------------------
     # LIST MEMBERS
     # ---------------------------

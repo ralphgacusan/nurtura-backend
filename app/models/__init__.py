@@ -14,3 +14,7 @@ from .task_completion import TaskCompletion
 from .schedule import Schedule
 
 from .chatbot_history import ChatbotHistory
+
+from .notification import Notification
+
+from .user_device import UserDevice

@@ -47,19 +47,21 @@ class CareSpaceMemberRepository:
     async def get_by_id(
         self, 
         member_id: int, 
-        eager_load_user: bool = False
+        eager_load_user: bool = False,
+        eager_load_care_space: bool = False  # new argument
     ) -> CareSpaceMember | None:
         """
         Retrieve a care space member by membership ID.
         """
         stmt = select(CareSpaceMember).where(CareSpaceMember.member_id == member_id)
 
-        # Optionally load the related user object
         if eager_load_user:
             stmt = stmt.options(selectinload(CareSpaceMember.user))
+        if eager_load_care_space:
+            stmt = stmt.options(selectinload(CareSpaceMember.care_space))
 
         result = await self.db.execute(stmt)
-        return result.scalars().first()  # return first match or None
+        return result.scalars().first()
 
     async def list_by_care_space(
         self, 

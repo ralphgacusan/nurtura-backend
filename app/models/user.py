@@ -176,3 +176,16 @@ class User(Base):
         cascade="all, delete-orphan",
         doc="All AI interactions associated with this user"
     )
+
+    notifications = relationship(
+        "Notification",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        doc="One-to-many relationship for notifications received by the user"
+    )
+
+    devices = relationship(
+        "UserDevice", 
+        back_populates="user", 
+        cascade="all, delete-orphan"
+    )

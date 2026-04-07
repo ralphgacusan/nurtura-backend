@@ -26,7 +26,8 @@ from app.api.v1.routers.care_space_member import router as care_space_member_rou
 from app.api.v1.routers.task import router as task_router
 from app.api.v1.routers.chatbot import router as chatbot_router
 from app.api.v1.routers.dashboard import router as dashboard_router
-
+from app.api.v1.routers.notification import router as notification_router
+from app.api.v1.routers.user_device import router as user_device_router
 
 from app.core.config import settings
 
@@ -82,7 +83,7 @@ app.include_router(
 )
 
 
-# Chatbot
+# Dashboard
 app.include_router(
     dashboard_router,
     prefix=f"{api_prefix}/dashboard",
@@ -97,6 +98,18 @@ app.include_router(
     tags=["chatbot"]
 )
 
+# Notifications
+app.include_router(
+    notification_router,
+    prefix=f"{api_prefix}/notifications",
+    tags=["notifications"]
+)
+
+# app.include_router(
+#     user_device_router,
+#     prefix=f"{api_prefix}/user-device",
+#     tags=["user-device"]
+# )
 
 
 

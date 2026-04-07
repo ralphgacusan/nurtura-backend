@@ -45,6 +45,9 @@ from app.core.exceptions import (
 from app.core.permissions import ensure_member_and_can_manage_tasks, ensure_member
 from app.services.care_space_member import CareSpaceMemberService
 from app.schemas.task_completion import CompletionStatus, TaskStatusUpdateRequest, TaskCompletionRead
+from app.schemas.notification import NotificationCreate
+from app.models.user_device import UserDevice
+from app.services.notification import NotificationService
 
 # ---------------------------
 # Task Service
@@ -63,12 +66,14 @@ class TaskService:
         schedule_repo: ScheduleRepository,
         completion_repo: TaskCompletionRepository,
         care_space_member_service: CareSpaceMemberService,
+        notification_service: NotificationService,
     ):
         self.task_repo = task_repo
         self.assignment_repo = assignment_repo
         self.schedule_repo = schedule_repo
         self.completion_repo = completion_repo
         self.care_space_member_service = care_space_member_service
+        self.notification_service = notification_service
 
     
     def _apply_filters(
@@ -134,6 +139,28 @@ class TaskService:
 
         return filtered
 
+    async def notify_task_assignment(self, task: Task, assigned_user_ids: list[int], assigned_by_user: User):
+        """
+        Notify assigned users when a task is created or updated.
+        """
+        for user_id in assigned_user_ids:
+            # Create DB notification
+            notif_data = NotificationCreate(
+                user_id=user_id,
+                title=f"{assigned_by_user.first_name} {assigned_by_user.last_name} assigned you a task",
+                message=f"Task: {task.title}\nDescription: {task.description}"
+            )
+            notif = await self.notification_service.create_notification(notif_data)
+
+            # # Send push via FCM
+            # devices = await self.user_device_repo.list_by_user(user_id)
+            # fcm_tokens = [d.fcm_token for d in devices]
+            # if fcm_tokens:
+            #     await self.notification_service.send_push_notification(
+            #         fcm_tokens,
+            #         notif.title,
+            #         notif.message
+            #     )
     # ---------------------------
     # CREATE TASK
     # ---------------------------
@@ -178,6 +205,15 @@ class TaskService:
                 except Exception:
                     raise task_assignment_creation_failed_exception
             await self.assignment_repo.db.commit()
+
+            # Fetch the member object of the user who assigned the task
+            assigned_by_member = await self.care_space_member_service.get_member_by_user_id(
+                user_id=task.assigned_by,
+                care_space_id=task.care_space_id
+            )
+            assigned_by_user = assigned_by_member.user  # get the related user object
+
+            await self.notify_task_assignment(task, assigned_user_ids, assigned_by_user)
 
         # Create schedules
         schedules = []
@@ -472,6 +508,16 @@ class TaskService:
             await self.assignment_repo.db.commit()
             await self.completion_repo.db.commit()
 
+            # Notify only the **newly added users**
+            new_user_ids = [
+                user_id for user_id in assigned_user_ids
+                if user_id not in existing_user_ids
+            ]
+
+            if new_user_ids:
+                assigned_by_user = await self.care_space_member_service.get_user(member.user_id)
+                await self.notify_task_assignment(task, new_user_ids, assigned_by_user)
+
         # -----------------
         # UPDATE SCHEDULES
         # -----------------
@@ -615,6 +661,7 @@ class TaskService:
         # Finally, delete the task itself
         deleted = await self.task_repo.delete_task(task_id)
         return deleted
+    
     
 
     # ---------------------------

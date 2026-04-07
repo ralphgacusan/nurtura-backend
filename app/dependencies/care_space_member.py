@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio import AsyncSession  # async session for DB operatio
 # Local Application Imports
 # ---------------------------
 from app.core.database import get_session  # provides AsyncSession for DB operations
+from app.dependencies.notification import get_notification_service
 from app.repositories.care_space_member import CareSpaceMemberRepository
 from app.repositories.care_space import CareSpaceRepository
 from app.repositories.user import UserRepository
@@ -37,6 +38,7 @@ from app.models.user import User
 from app.core.exceptions import care_space_dependent_not_found_exception
 from app.core.permissions import ensure_member_and_can_manage_tasks
 from app.dependencies.auth import get_current_user
+from app.services.notification import NotificationService
 
 # ---------------------------
 # Repository Dependencies
@@ -93,6 +95,8 @@ async def get_care_space_member_service(
     member_repo: Annotated[CareSpaceMemberRepository, Depends(get_care_space_member_repo)],
     care_space_repo: Annotated[CareSpaceRepository, Depends(get_care_space_repo)],
     user_repo: Annotated[UserRepository, Depends(get_user_repo)],
+    notification_service: Annotated[NotificationService, Depends(get_notification_service)],  # ← added
+
 ) -> CareSpaceMemberService:
     """
     Provides a CareSpaceMemberService instance for dependency injection.
@@ -108,7 +112,7 @@ async def get_care_space_member_service(
     Returns:
         CareSpaceMemberService: Service that handles business logic for care space members.
     """
-    return CareSpaceMemberService(member_repo, care_space_repo, user_repo)
+    return CareSpaceMemberService(member_repo, care_space_repo, user_repo, notification_service=notification_service)
 
 
 # ---------------------------

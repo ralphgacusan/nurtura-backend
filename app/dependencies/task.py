@@ -19,10 +19,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Local App Imports
 # ---------------------------
 from app.core.database import get_session
+from app.dependencies.notification import get_notification_service
 from app.repositories.task import TaskRepository
 from app.repositories.task_assignment import TaskAssignmentRepository
 from app.repositories.schedule import ScheduleRepository
 from app.repositories.task_completion import TaskCompletionRepository
+from app.services.notification import NotificationService
 from app.services.task import TaskService
 from app.services.care_space_member import CareSpaceMemberService
 from app.dependencies.care_space_member import get_care_space_member_service
@@ -70,14 +72,16 @@ async def get_task_service(
     schedule_repo: Annotated[ScheduleRepository, Depends(get_schedule_repo)],
     completion_repo: Annotated[TaskCompletionRepository, Depends(get_task_completion_repo)],
     care_space_member_service: Annotated[CareSpaceMemberService, Depends(get_care_space_member_service)],
+    notification_service: Annotated[NotificationService, Depends(get_notification_service)],  # ← added
 ) -> TaskService:
     """
-    Provide a TaskService instance with all required repositories injected.
+    Provide a TaskService instance with all required repositories and services injected.
     """
     return TaskService(
         task_repo=task_repo,
         assignment_repo=assignment_repo,
         schedule_repo=schedule_repo,
         completion_repo=completion_repo,
-        care_space_member_service=care_space_member_service
+        care_space_member_service=care_space_member_service,
+        notification_service=notification_service  # ← inject here
     )

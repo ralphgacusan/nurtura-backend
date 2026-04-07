@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession  # Async DB session
 # Local Application Imports
 # ---------------------------
 from app.core.database import get_session
+from app.dependencies.notification import get_notification_service
 from app.repositories.user import UserRepository
 from app.repositories.dependent_profile import DependentProfileRepository 
 from app.repositories.care_space import CareSpaceRepository
@@ -39,6 +40,7 @@ from app.repositories.care_space_join_code import CareSpaceJoinCodeRepository
 from app.services.care_space import CareSpaceService
 from app.services.care_space_member import CareSpaceMemberService
 from app.services.care_space_join_code import CareSpaceJoinCodeService
+from app.services.notification import NotificationService
 
 # ---------------------------
 # Repository Dependencies
@@ -125,6 +127,8 @@ async def get_care_space_member_service(
     member_repo: Annotated[CareSpaceMemberRepository, Depends(get_care_space_member_repo)],
     care_space_repo: Annotated[CareSpaceRepository, Depends(get_care_space_repo)],
     user_repo: Annotated[UserRepository, Depends(get_user_repo)],
+    notification_service: Annotated[NotificationService, Depends(get_notification_service)],  # ← added
+
 ) -> CareSpaceMemberService:
     """
     Provide CareSpaceMemberService with all required repositories injected.
@@ -137,21 +141,23 @@ async def get_care_space_member_service(
     Returns:
         CareSpaceMemberService: Service instance for business logic
     """
-    return CareSpaceMemberService(member_repo, care_space_repo, user_repo)
+    return CareSpaceMemberService(member_repo, care_space_repo, user_repo, notification_service=notification_service)
 
 
 async def get_care_space_service(
     care_space_repo: Annotated[CareSpaceRepository, Depends(get_care_space_repo)],
     user_repo: Annotated[UserRepository, Depends(get_user_repo)],
     member_repo: Annotated[CareSpaceMemberRepository, Depends(get_care_space_member_repo)],
+    notification_service: Annotated[NotificationService, Depends(get_notification_service)],  
 ) -> CareSpaceService:
     """
-    Provide CareSpaceService instance with required repositories injected.
+    Provide CareSpaceService instance with required repositories and services injected.
 
     Args:
         care_space_repo (CareSpaceRepository): Repository for care spaces
         user_repo (UserRepository): Repository for users
         member_repo (CareSpaceMemberRepository): Repository for care space members
+        notification_service (NotificationService): Notification service for in-app notifications
 
     Returns:
         CareSpaceService: Service instance for care space business logic
@@ -159,7 +165,8 @@ async def get_care_space_service(
     return CareSpaceService(
         care_space_repo=care_space_repo,
         user_repo=user_repo,
-        member_repo=member_repo,      # ✅ repository injection
+        member_repo=member_repo,
+        notification_service=notification_service  # ← inject here
     )
 
 

@@ -74,6 +74,11 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
 
     # -------------------------
+    # FCM SERVER KEY
+    # -------------------------
+    FCM_SERVER_KEY: str
+
+    # -------------------------
     # Computed Properties
     # -------------------------
 

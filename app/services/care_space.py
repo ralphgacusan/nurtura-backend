@@ -28,6 +28,8 @@ from app.models.user import User
 from app.core.permissions import ensure_family_member, ensure_member, ensure_family_owner
 from app.core.exceptions import care_space_not_found_exception, user_not_found_exception
 from app.core.config import settings
+from app.services.notification import NotificationService
+from app.schemas.notification import NotificationCreate
 
 # ---------------------------
 # CareSpace Service
@@ -46,10 +48,13 @@ class CareSpaceService:
         care_space_repo: CareSpaceRepository,
         user_repo: UserRepository,
         member_repo: CareSpaceMemberRepository,
+        notification_service: NotificationService,
+
     ):
         self.care_space_repo = care_space_repo
         self.user_repo = user_repo
         self.member_repo = member_repo
+        self.notification_service = notification_service
 
     # ---------------------------
     # PRIVATE: Get Member
@@ -121,6 +126,22 @@ class CareSpaceService:
             care_space.care_space_id,
             eager_load=True
         )
+
+        # ---------------------------
+        # 5. CREATE NOTIFICATION
+        # ---------------------------
+        if self.notification_service:
+                        # notify all dependent members
+            if data.dependent_user_ids:
+                for user_id in data.dependent_user_ids:
+                    notification_data = NotificationCreate(
+                        user_id=user_id,
+                        title="Added to Care Space",
+                        message=f"You have been added to the care space '{care_space.name}'.",
+                        link=f"/care_spaces/{care_space.care_space_id}"
+                    )
+                    await self.notification_service.create_notification(notification_data)
+
 
         return CareSpaceRead.model_validate(care_space)
 
